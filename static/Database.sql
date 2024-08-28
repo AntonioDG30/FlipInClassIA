@@ -17,7 +17,7 @@ CREATE TABLE Docente
 -- Creazione della tabella Corsi
 CREATE TABLE Corso
 (
-    corso_id    INT AUTO_INCREMENT PRIMARY KEY,
+    corso_id    VARCHAR(100) PRIMARY KEY,
     nome        VARCHAR(100),
     descrizione TEXT,
     docente_id  VARCHAR(100),
@@ -32,6 +32,15 @@ CREATE TABLE Studente
     cognome     VARCHAR(100),
     email       VARCHAR(100),
     password    VARCHAR(100)
+);
+
+-- Creazione della tabella Partecipa
+CREATE TABLE Partecipa
+(
+    studente_id VARCHAR(100),
+    corso_id    VARCHAR(100),
+    FOREIGN KEY (studente_id) REFERENCES Studente (studente_id),
+    FOREIGN KEY (corso_id) REFERENCES Corso (corso_id)
 );
 
 -- Creazione della tabella Argomenti
