@@ -28,6 +28,39 @@ def index():
 def login():
     return render_template('login.html')
 
+# Rotta per la pagina di registrazione
+@app.route('/registrati')
+def registrati():
+    return render_template('registrati.html')
+
+# Rotta per la dashboard
+# Rotta per la dashboard
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' in session:
+        user_id = session['user_id']
+        user_type = session['user_type']
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Determina il numero di corsi in cui l'utente è coinvolto
+        if user_type == 'docente':
+            query = "SELECT COUNT(*) FROM Corso WHERE docente_id = %s"
+            cursor.execute(query, (user_id,))
+        else:  # Per gli studenti
+            #query = "SELECT COUNT(*) FROM Corso WHERE studente_id = %s"
+            #cursor.execute(query, (user_id,))
+            cursor.execute("SELECT 100")
+
+        numero_corsi = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+
+        return render_template('dashboard.html', user_id=user_id, user_type=user_type, numero_corsi=numero_corsi)
+    else:
+        flash('Devi essere loggato per accedere alla dashboard.')
+        return redirect(url_for('login'))
+
 # Rotta per la pagina di login
 @app.route('/loginForm', methods=['GET', 'POST'])
 def loginForm():
@@ -60,6 +93,7 @@ def loginForm():
             # Imposta i dettagli dell'utente nella sessione
             session['user_id'] = user['docente_id'] if user_type == 'docente' else user['studente_id']
             session['user_type'] = user_type
+            session['user_name'] = user['nome'] + " " + user['cognome']
             session['session_secret'] = secrets.token_hex(16)  # Genera una chiave segreta specifica per la sessione
 
             flash('Login avvenuto con successo!')
@@ -68,23 +102,6 @@ def loginForm():
             flash('Email o password non corretti. Riprova.')
 
     return render_template('login.html')
-
-# Rotta per la pagina di registrazione
-@app.route('/registrati')
-def registrati():
-    return render_template('registrati.html')
-
-# Rotta per la dashboard
-@app.route('/dashboard')
-def dashboard():
-    if 'user_id' in session:
-        user_id = session['user_id']
-        user_type = session['user_type']
-        user_session_secret = session['session_secret']  # Chiave segreta specifica per la sessione
-        return render_template('dashboard.html', user_id=user_id, user_type=user_type, session_secret=user_session_secret)
-    else:
-        flash('Devi essere loggato per accedere alla dashboard.')
-        return redirect(url_for('login'))
 
 # Rotta per la gestione del form di registrazione
 @app.route('/registratiForm', methods=['GET', 'POST'])

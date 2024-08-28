@@ -666,9 +666,9 @@ body {
 }
 
 .logo {
-    background-image: url(../img/svg/Logo.svg);
+    background-image: url(../img/svg/logoMini.png);
     width: 49px;
-    height: 49px
+    height: 70px
 }
 
 .menu-toggle {
@@ -1616,7 +1616,7 @@ label {
 
 .sidebar-user__title {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 12px;
     letter-spacing: .75px;
     color: #fff
 }
@@ -1656,14 +1656,14 @@ label {
 }
 
 .logo-subtitle, .logo-title {
-    font-size: 21px;
+    font-size: 14px;
     font-weight: 700;
     line-height: 1.4;
     letter-spacing: .86px
 }
 
 .logo-subtitle {
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 500;
     line-height: 2.42
 }
@@ -2880,6 +2880,10 @@ input:checked + .slider:before {
     background-image: url(../img/svg/Bulk/Menu-toggle-white.svg)
 }
 
+.darkmode .colorText {
+    color: white
+}
+
 @media (min-width: 576px) {
     .container {
         max-width: 540px
@@ -3563,7 +3567,7 @@ input:checked + .slider:before {
     }
 
     .main-nav-start, .main-nav-start input {
-        width: 100%
+        width: 100%;
     }
 
     .main-nav-end {

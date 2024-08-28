@@ -1027,7 +1027,7 @@ body {
 }
 
 .logo {
-    background-image: url(../img/svg/Logo.svg);
+    background-image: url(../img/svg/logoMini.png);
     width: 49px;
     height: 49px;
 }
@@ -2135,7 +2135,7 @@ label {
 
 .sidebar-user__title {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 10px;
     letter-spacing: 0.75px;
     color: #FFFFFF;
 }
