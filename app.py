@@ -1,9 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
+from PIL import Image, ImageDraw, ImageFont
 import mysql.connector
 import uuid
 import bcrypt
 import os
 import secrets
+import random
+import string
+import uuid
 
 app = Flask(__name__)
 
@@ -59,11 +63,11 @@ def dashboard():
 
         # Determina i corsi in cui l'utente è coinvolto
         if user_type == 'docente':
-            query = ("SELECT C.corso_id, C.nome AS corso_nome, C.descrizione AS corso_descrizione "
+            query = ("SELECT C.corso_id, C.nome AS corso_nome, C.descrizione AS corso_descrizione, C.image_path AS corso_immagine "
                      "FROM Corso AS C WHERE C.docente_id = %s")
             cursor.execute(query, (user_id,))
         else:  # Per gli studenti
-            query = ("SELECT C.corso_id, C.nome AS corso_nome, C.descrizione AS corso_descrizione "
+            query = ("SELECT C.corso_id, C.nome AS corso_nome, C.descrizione AS corso_descrizione, C.image_path AS corso_immagine"
                      "FROM Corso AS C "
                      "JOIN Partecipa AS P ON C.corso_id = P.corso_id "
                      "WHERE P.studente_id = %s")
@@ -80,6 +84,41 @@ def dashboard():
         return redirect(url_for('login'))
 
 
+IMAGES_PATH = "static/dashboardStaticFile/img/corsi"
+os.makedirs(IMAGES_PATH, exist_ok=True)
+
+def generate_course_image(course_name, corso_id):
+    # Crea un'immagine con un colore di sfondo generico
+    img = Image.new('RGB', (200, 200), color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
+
+    # Usa le prime due lettere del nome del corso, in maiuscolo
+    initials = (course_name[:2] if len(course_name) >= 2 else course_name).upper()
+
+    # Carica un font di default; puoi specificare un file TTF se vuoi un font particolare
+    draw = ImageDraw.Draw(img)
+    try:
+        # Se hai un font TTF specifico, specifica il percorso qui
+        font = ImageFont.truetype("arial.ttf", 100)
+    except IOError:
+        # Usa il font di default se quello specificato non è disponibile
+        font = ImageFont.load_default()
+
+    # Calcola la posizione per centrare il testo usando textbbox
+    bbox = draw.textbbox((0, 0), initials, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    position = ((img.width - text_width) // 2, (img.height - text_height) // 2)
+
+    # Aggiungi il testo all'immagine
+    draw.text(position, initials, fill=(255, 255, 255), font=font)
+
+    # Salva l'immagine con il corso_id come nome del file
+    image_filename = f"{corso_id}.png"
+    image_path = os.path.join(IMAGES_PATH, image_filename)
+    img.save(image_path)
+
+    return image_filename  # Restituisce solo il nome del file per salvare nel database
+
 @app.route('/crea_corso', methods=['POST'])
 def crea_corso():
     if 'user_id' in session and session['user_type'] == 'docente':
@@ -87,11 +126,17 @@ def crea_corso():
         course_description = request.form['courseDescription']
         docente_id = session['user_id']
 
+        # Genera un corso_id esadecimale univoco di 6 caratteri
+        corso_id = ''.join(random.choices('0123456789abcdef', k=6))
+
+        # Genera l'immagine per il corso
+        image_filename = generate_course_image(course_name, corso_id)
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        query = "INSERT INTO Corso (corso_id, nome, descrizione, docente_id) VALUES (%s, %s, %s, %s)"
-        corso_id = str(uuid.uuid4())
-        cursor.execute(query, (corso_id, course_name, course_description, docente_id))
+        # Aggiungi il campo per il percorso dell'immagine nel database
+        query = "INSERT INTO Corso (corso_id, nome, descrizione, docente_id, image_path) VALUES (%s, %s, %s, %s, %s)"
+        cursor.execute(query, (corso_id, course_name, course_description, docente_id, image_filename))
         conn.commit()
         cursor.close()
         conn.close()
@@ -122,6 +167,14 @@ def partecipa_corso():
         flash('Non sei autorizzato a partecipare a un corso.')
 
     return redirect(url_for('dashboard'))
+
+
+@app.route('/indexCorso')
+def indexCorso():
+    # Recupera il corso_id passato come parametro dalla query
+    corso_id = request.args.get('corso_id')
+
+    return render_template('indexCorso.html', corso_id=corso_id)
 
 
 # Rotta per la gestione del form di login

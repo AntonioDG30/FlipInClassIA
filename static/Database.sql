@@ -21,6 +21,7 @@ CREATE TABLE Corso
     nome        VARCHAR(100),
     descrizione TEXT,
     docente_id  VARCHAR(100),
+    image_path  VARCHAR(100),
     FOREIGN KEY (docente_id) REFERENCES Docente (docente_id)
 );
 

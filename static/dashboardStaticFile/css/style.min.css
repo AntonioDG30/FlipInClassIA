@@ -2059,108 +2059,61 @@ label {
     padding-right: 10px
 }
 
-.stat-cards-icon, .stat-cards-item {
-    display: -webkit-box;
-    display: -ms-flexbox;
-    display: flex;
-    -webkit-box-align: center;
-    -ms-flex-align: center;
-    align-items: center;
-    -ms-flex-wrap: wrap;
-    flex-wrap: wrap
+.course-image {
+    width: 60px; /* Dimensione dell'immagine */
+    height: 60px; /* Dimensione dell'immagine */
+    border-radius: 50%; /* Rende l'immagine rotonda */
+    object-fit: cover; /* Assicura che l'immagine si adatti al contenitore senza distorsioni */
 }
 
 .stat-cards-item {
-    padding: 24px 19px;
-    background-color: #fff;
-    -webkit-box-shadow: 0 15px 50px rgba(160, 163, 189, .1);
-    box-shadow: 0 15px 50px rgba(160, 163, 189, .1);
-    border-radius: 10px;
-    height: 100%
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background-color: #f8f9fa; /* Colore di sfondo per il contenitore */
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Effetto ombra per il contenitore */
 }
 
-.stat-cards-icon {
-    -webkit-box-pack: center;
-    -ms-flex-pack: center;
-    justify-content: center;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    margin-right: 9px
-}
-
-.stat-cards-icon.primary {
-    background-color: rgba(47, 73, 209, .1);
-    color: #2f49d1
-}
-
-.stat-cards-icon.warning {
-    background-color: rgba(255, 182, 72, .1);
-    color: #ffb648
-}
-
-.stat-cards-icon.purple {
-    background-color: rgba(95, 46, 234, .1);
-    color: #5f2eea
-}
-
-.stat-cards-icon.success {
-    background-color: rgba(75, 222, 151, .1);
-    color: #4bde97
-}
-
-.stat-cards-info__num {
-    font-weight: 600;
-    font-size: 18px;
-    line-height: 1.22;
-    color: #171717;
-    margin-bottom: 4px
+.stat-cards-info {
+    margin-left: 15px;
 }
 
 .stat-cards-info__title {
-    font-weight: 500;
-    font-size: 14px;
-    line-height: 1.22;
-    color: #b9b9b9;
-    margin-bottom: 6px
-}
-
-.stat-cards-info__profit, .stat-cards-info__progress {
-    display: -webkit-box;
-    display: -ms-flexbox;
-    display: flex;
-    -webkit-box-align: center;
-    -ms-flex-align: center;
-    align-items: center;
-    font-size: 14px;
-    line-height: 1.22
+    font-size: 18px; /* Nome del corso in grande */
+    color: #000000;
+    font-weight: bold;
+    margin: 0;
 }
 
 .stat-cards-info__progress {
-    color: #b9b9b9
+    font-size: 14px; /* Descrizione in piccolo */
+    color: #6c757d; /* Colore grigio per la descrizione */
+    margin: 5px 0;
 }
 
-.stat-cards-info__profit {
-    margin-right: 10px
+.stat-cards-info__num {
+    font-size: 12px; /* Codice corso in piccolo */
+    color: #6c757d; /* Colore grigio per il codice corso */
+    margin: 0;
 }
 
-.stat-cards-info__profit.success {
-    color: #4bde97
+.stat-cards-info {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.stat-cards-info__profit.danger {
-    color: #f26464
+.stat-cards-info__num,
+.stat-cards-info__title,
+.stat-cards-info__progress {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.stat-cards-info__profit.warning {
-    color: #ffb648
-}
-
-.stat-cards-info__profit svg {
-    width: 16px;
-    height: 16px;
-    margin-right: 5px
-}
 
 .chart #myChart, .customers-wrapper {
     -webkit-box-shadow: 0 15px 50px rgba(160, 163, 189, .1);
@@ -2818,9 +2771,12 @@ input:checked + .slider:before {
     -webkit-box-shadow: none;
     box-shadow: none
 }
+.darkmode .stat-cards-info__title {
+    color: #fffff0
+}
 
-.darkmode .stat-cards-info__num {
-    color: #eff0f6
+.darkmode .stat-cards-info__num, .darkmode .stat-cards-info__progress {
+    color: #fffff0
 }
 
 .darkmode .chart {
