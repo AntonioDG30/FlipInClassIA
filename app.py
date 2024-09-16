@@ -1,5 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from PIL import Image, ImageDraw, ImageFont
+from datetime import datetime
 import mysql.connector
 import uuid
 import bcrypt
@@ -175,6 +176,65 @@ def indexCorso():
     corso_id = request.args.get('corso_id')
 
     return render_template('indexCorso.html', corso_id=corso_id)
+
+
+@app.route('/api/lezioni', methods=['GET'])
+def get_lezioni():
+    corso_id = request.args.get('corso_id')  # Prende il corso_id dai parametri della query
+    if not corso_id:
+        return jsonify({"error": "Parametro 'corso_id' mancante"}), 400
+
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Errore di connessione al database"}), 500
+
+    cursor = conn.cursor(dictionary=True)
+    query = "SELECT * FROM lezione WHERE corso_id = %s"
+    cursor.execute(query, (corso_id,))
+
+    # Data corrente per il confronto
+    oggi = datetime.now().date()
+
+    lezioni = cursor.fetchall()
+    result = []
+    for lezione in lezioni:
+        # Controlla e converte 'data' in oggetto datetime.date se necessario
+        try:
+            data_lezione = lezione['data']
+            if isinstance(data_lezione, str):
+                data_lezione = datetime.strptime(data_lezione, '%Y-%m-%d').date()  # Assicurati di ottenere solo la data
+            elif isinstance(data_lezione, datetime):
+                data_lezione = data_lezione.date()
+            else:
+                # Se data_lezione è già un oggetto di tipo date, non fare nulla
+                pass
+
+            # Determina il colore in base alla data dell'evento
+            if data_lezione < oggi:
+                colore = 'green'
+                calendar = 'Lezione passata'
+            elif data_lezione == oggi:
+                colore = 'orange'
+                calendar = 'Lezione odierna'
+            else:
+                colore = 'blue'
+                calendar = 'Lezione programmata'
+
+            result.append({
+                'descrizione': f"{lezione['descrizione']}",
+                'calendar': calendar,
+                'color': colore,
+                'date': data_lezione.strftime('%Y-%m-%d')
+            })
+
+        except Exception as e:
+            print(f"Errore nella gestione della data: {e}")
+            # Aggiungi una gestione degli errori se necessario
+
+    cursor.close()
+    conn.close()
+
+    return jsonify(result)
 
 
 # Rotta per la gestione del form di login
