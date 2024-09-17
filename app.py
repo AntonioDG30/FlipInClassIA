@@ -65,7 +65,7 @@ def dashboard():
         # Determina i corsi in cui l'utente è coinvolto
         if user_type == 'docente':
             query = ("SELECT C.corso_id, C.nome AS corso_nome, C.descrizione AS corso_descrizione, C.image_path AS corso_immagine "
-                     "FROM Corso AS C WHERE C.docente_id = %s")
+                     "FROM Corso AS C WHERE C.corso_id IN (SELECT corso_id FROM Lavora WHERE docente_id = %s)")
             cursor.execute(query, (user_id,))
         else:  # Per gli studenti
             query = ("SELECT C.corso_id, C.nome AS corso_nome, C.descrizione AS corso_descrizione, C.image_path AS corso_immagine"
@@ -135,11 +135,15 @@ def crea_corso():
 
         conn = get_db_connection()
         cursor = conn.cursor()
+        cursor2 = conn.cursor()
         # Aggiungi il campo per il percorso dell'immagine nel database
-        query = "INSERT INTO Corso (corso_id, nome, descrizione, docente_id, image_path) VALUES (%s, %s, %s, %s, %s)"
-        cursor.execute(query, (corso_id, course_name, course_description, docente_id, image_filename))
+        query = "INSERT INTO Corso (corso_id, nome, descrizione, image_path) VALUES (%s, %s, %s, %s)"
+        cursor.execute(query, (corso_id, course_name, course_description, image_filename))
+        query2 = "INSERT INTO Lavora (docente_id, corso_id) VALUES (%s, %s)"
+        cursor2.execute(query2, (docente_id, corso_id))
         conn.commit()
         cursor.close()
+        cursor2.close()
         conn.close()
 
         flash('Corso creato con successo!')
@@ -172,10 +176,63 @@ def partecipa_corso():
 
 @app.route('/indexCorso')
 def indexCorso():
-    # Recupera il corso_id passato come parametro dalla query
-    corso_id = request.args.get('corso_id')
+    if 'user_id' in session:
+        user_id = session['user_id']
+        user_type = session['user_type']
 
-    return render_template('indexCorso.html', corso_id=corso_id)
+        # Recupera il corso_id passato come parametro dalla query
+        corso_id = request.args.get('corso_id')
+
+        oggi = datetime.now().date()
+
+        conn = get_db_connection()
+        if conn is None:
+            return jsonify({"error": "Errore di connessione al database"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        query = ("SELECT C.nome FROM Corso AS C WHERE C.corso_id = %s")
+        cursor.execute(query, (corso_id,))
+        nome_corso = cursor.fetchone()
+
+        if nome_corso:
+            nome_corso = nome_corso['nome']
+        else:
+            nome_corso = "Corso non trovato"
+
+        print(nome_corso)
+
+        cursor2 = conn.cursor(dictionary=True)
+        query2 = ("SELECT D.nome, D.cognome, LE.data, LE.descrizione, LE.lezione_id "
+                  "FROM Lezione AS LE "
+                  "JOIN Docente AS D ON LE.docente_id = D.docente_id "
+                  "JOIN Corso AS C ON C.corso_id = LE.corso_id "
+                  "WHERE C.corso_id = %s "
+                  "ORDER BY LE.data DESC")
+        cursor2.execute(query2, (corso_id,))
+        calendario_lezioni = cursor2.fetchall()
+
+        cursor3 = conn.cursor(dictionary=True)
+        query3 = ("SELECT ARG.nome_argomento, ARG.lezione_id "
+                 "FROM Lezione_argomento AS ARG, Corso AS C, Lezione AS L "
+                 "WHERE C.corso_id = %s "
+                 "AND C.corso_id = L.corso_id AND L.lezione_id = ARG.lezione_id ")
+        cursor3.execute(query3, (corso_id,))
+        argomenti_lezioni = cursor3.fetchall()
+
+        cursor.close()
+        cursor2.close()
+        cursor3.close()
+        conn.close()
+
+        return render_template('indexCorso.html', user_id=user_id, user_type=user_type,
+                               nome_corso=nome_corso, corso_id=corso_id, calendario_lezioni=calendario_lezioni,
+                               oggi=oggi, argomenti_lezioni=argomenti_lezioni)
+
+    else:
+        flash('Devi essere loggato per accedere alla dashboard.')
+    return redirect(url_for('login'))
+
+
 
 
 @app.route('/api/lezioni', methods=['GET'])

@@ -1271,24 +1271,24 @@ button.disabled:focus {
 }
 
 .badge-active, .badge-disabled, .badge-pending, .badge-success, .badge-trashed {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     padding: 1px;
     width: 85px;
     font-weight: 500;
     font-size: 12px;
     line-height: 1.67;
-    display: -webkit-box;
-    display: -ms-flexbox;
     display: flex;
-    -webkit-box-pack: center;
-    -ms-flex-pack: center;
     justify-content: center;
-    -webkit-box-align: center;
-    -ms-flex-align: center;
     align-items: center;
-    -ms-flex-wrap: wrap;
-    flex-wrap: wrap;
     border-radius: 100px;
-    text-align: center
+    text-align: center;
+}
+
+.table-cell {
+    position: relative;
 }
 
 .badge-active {
@@ -1297,13 +1297,17 @@ button.disabled:focus {
 }
 
 .badge-pending {
-    color: #ffb648;
+    color: #d49120;
     background-color: rgba(255, 172, 50, .1)
 }
 
+
+
 .badge-disabled {
-    color: #fff;
-    background-color: #ffb648
+    color: #008000;
+    background-color: rgba( 110,170,94, .1)
+
+
 }
 
 .badge-trashed {
@@ -1419,7 +1423,8 @@ label {
 .users-table-info {
     height: 48px;
     border-bottom: 1.2px solid #dadbe4;
-    font-size: 14px
+    font-size: 14px;
+    text-align: center;
 }
 
 .users-table-info th {
@@ -1450,7 +1455,8 @@ label {
     border-top: 1px solid #eee;
     border-bottom: 1px solid #eee;
     padding-top: 15px;
-    padding-bottom: 15px
+    padding-bottom: 15px;
+    text-align: center;
 }
 
 .users-table td:first-child {
@@ -2644,6 +2650,10 @@ input:checked + .slider:before {
     transform: translateX(26px);
 }
 
+.darkmode .slider-label {
+    color: #d6d7e3;
+}
+
 
 /* Modal Styling */
 .modal {
@@ -2884,8 +2894,13 @@ input:checked + .slider:before {
 }
 
 .darkmode .badge-disabled {
-    background-color: rgba(255, 182, 72, .1);
-    color: #ffb648
+    background-color: rgba(110,170,94, .1);
+    color: #6eaa5e
+}
+
+.darkmode .badge-pending {
+    color: #ffb648;
+    background-color: rgba(255, 172, 50, .1)
 }
 
 .darkmode .primary-white-btn {
@@ -4211,6 +4226,21 @@ input:checked + .slider:before {
 
 .darkmode .day-name {
     color: #eff0f6;
+}
+
+.hidden-row {
+    display: none;
+}
+
+.toggle-icon {
+  cursor: pointer;
+  font-size: 1.2em;
+  color: #666;
+  transition: transform 0.3s;
+}
+
+.toggle-icon:hover {
+  color: #000;
 }
 
 /*# sourceMappingURL=style.min.css.map */
