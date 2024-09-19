@@ -68,7 +68,7 @@ def dashboard():
                      "FROM Corso AS C WHERE C.corso_id IN (SELECT corso_id FROM Lavora WHERE docente_id = %s)")
             cursor.execute(query, (user_id,))
         else:  # Per gli studenti
-            query = ("SELECT C.corso_id, C.nome AS corso_nome, C.descrizione AS corso_descrizione, C.image_path AS corso_immagine"
+            query = ("SELECT C.corso_id, C.nome AS corso_nome, C.descrizione AS corso_descrizione, C.image_path AS corso_immagine "
                      "FROM Corso AS C "
                      "JOIN Partecipa AS P ON C.corso_id = P.corso_id "
                      "WHERE P.studente_id = %s")
@@ -139,7 +139,7 @@ def crea_corso():
         # Aggiungi il campo per il percorso dell'immagine nel database
         query = "INSERT INTO Corso (corso_id, nome, descrizione, image_path) VALUES (%s, %s, %s, %s)"
         cursor.execute(query, (corso_id, course_name, course_description, image_filename))
-        query2 = "INSERT INTO Lavora (docente_id, corso_id) VALUES (%s, %s)"
+        query2 = "INSERT INTO Lavora (docente_id, corso_id, proprietario) VALUES (%s, %s, 1)"
         cursor2.execute(query2, (docente_id, corso_id))
         conn.commit()
         cursor.close()
@@ -194,12 +194,11 @@ def indexCorso():
         cursor.execute(query, (corso_id,))
         nome_corso = cursor.fetchone()
 
+
         if nome_corso:
             nome_corso = nome_corso['nome']
         else:
             nome_corso = "Corso non trovato"
-
-        print(nome_corso)
 
         cursor2 = conn.cursor(dictionary=True)
         query2 = ("SELECT D.nome, D.cognome, LE.data, LE.descrizione, LE.lezione_id "
@@ -219,14 +218,21 @@ def indexCorso():
         cursor3.execute(query3, (corso_id,))
         argomenti_lezioni = cursor3.fetchall()
 
+        cursor4 = conn.cursor(dictionary=True)
+        query4 = ("SELECT D.nome, D.cognome, D.image_path FROM Lavora AS L, Docente AS D "
+                 "WHERE L.corso_id = %s AND L.proprietario = 1 AND D.docente_id = L.docente_id")
+        cursor4.execute(query4, (corso_id,))
+        docente_presidente = cursor4.fetchone()
+
         cursor.close()
         cursor2.close()
         cursor3.close()
+        cursor4.close()
         conn.close()
 
         return render_template('indexCorso.html', user_id=user_id, user_type=user_type,
                                nome_corso=nome_corso, corso_id=corso_id, calendario_lezioni=calendario_lezioni,
-                               oggi=oggi, argomenti_lezioni=argomenti_lezioni)
+                               oggi=oggi, argomenti_lezioni=argomenti_lezioni, docente_presidente=docente_presidente)
 
     else:
         flash('Devi essere loggato per accedere alla dashboard.')
@@ -331,6 +337,7 @@ def loginForm():
             session['user_id'] = user['docente_id'] if user_type == 'docente' else user['studente_id']
             session['user_type'] = user_type
             session['user_name'] = user['nome'] + " " + user['cognome']
+            session['image'] = user['image_path']
 
             flash('Login avvenuto con successo!')
             return redirect(url_for('dashboard'))
@@ -339,6 +346,38 @@ def loginForm():
 
     return render_template('login.html')
 
+# Percorso per le immagini profilo degli utenti
+USER_IMAGES_PATH = "static/dashboardStaticFile/img/utenti"
+os.makedirs(USER_IMAGES_PATH, exist_ok=True)
+
+def generate_user_image(name, cognome, user_id):
+    # Crea un'immagine con uno sfondo colorato casuale
+    img = Image.new('RGB', (200, 200), color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
+
+    # Usa le iniziali del nome e cognome
+    initials = (name[0] + cognome[0]).upper()
+
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("arial.ttf", 100)
+    except IOError:
+        font = ImageFont.load_default()
+
+    # Calcola la posizione per centrare il testo
+    bbox = draw.textbbox((0, 0), initials, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    position = ((img.width - text_width) // 2, (img.height - text_height) // 2)
+
+    # Disegna le iniziali sull'immagine
+    draw.text(position, initials, fill=(255, 255, 255), font=font)
+
+    # Salva l'immagine con il user_id come nome file
+    image_filename = f"{user_id}.png"
+    image_path = os.path.join(USER_IMAGES_PATH, image_filename)
+    img.save(image_path)
+
+    return image_filename  # Restituisci il nome del file per il database
 
 # Rotta per la gestione del form di registrazione
 @app.route('/registratiForm', methods=['GET', 'POST'])
@@ -350,35 +389,75 @@ def registratiForm():
         password = request.form['password']
         user_type = 'docente' if 'userType' in request.form else 'studente'
 
-        # Genera un ID univoco
-        user_id = str(uuid.uuid4())
-
-        # Cifra la password prima di memorizzarla
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
-        # Inserisci i dati nella tabella appropriata
+        # Connessione al database
         conn = get_db_connection()
         if conn is None:
             flash('Errore di connessione al database.')
             return redirect(url_for('registrati'))
 
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=True)
 
-        if user_type == 'docente':
-            query = "INSERT INTO Docente (docente_id, nome, cognome, email, password) VALUES (%s, %s, %s, %s, %s)"
-            cursor.execute(query, (user_id, name, cognome, email, hashed_password.decode('utf-8')))
-        else:
-            query = "INSERT INTO Studente (studente_id, nome, cognome, email, password) VALUES (%s, %s, %s, %s, %s)"
-            cursor.execute(query, (user_id, name, cognome, email, hashed_password.decode('utf-8')))
+        try:
+            # Verifica se l'email esiste già per un docente
+            query = "SELECT * FROM Docente WHERE email = %s"
+            cursor.execute(query, (email,))
+            existing_user = cursor.fetchone()  # Leggi un singolo risultato
+            cursor.fetchall()  # This ensures that all results are fetched
 
-        conn.commit()
-        cursor.close()
-        conn.close()
+            # Se non esiste tra i docenti, verifica se esiste tra gli studenti
+            if not existing_user:
+                query = "SELECT * FROM Studente WHERE email = %s"
+                cursor.execute(query, (email,))
+                existing_user = cursor.fetchone()  # Leggi un singolo risultato
+                cursor.fetchall()  # Fetch remaining results
+
+            # Se l'email esiste già, mostra un messaggio di errore
+            if existing_user:
+                flash('L\'email esiste già. Riprova!')
+                return redirect(url_for('registrati'))
+
+            # Genera un ID univoco per l'utente
+            user_id = str(uuid.uuid4())
+
+            # Cifra la password
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+            # Controlla se un file immagine è stato caricato
+            image = request.files.get('profilePicture')
+            if image and image.filename != '':
+                # Se è stata caricata un'immagine, salvala
+                ext = os.path.splitext(image.filename)[1]  # Estrai l'estensione del file
+                image_filename = f"{user_id}{ext}"
+                image_path = os.path.join(USER_IMAGES_PATH, image_filename)
+                image.save(image_path)  # Salva l'immagine nel percorso specificato
+            else:
+                # Se non è stata caricata un'immagine, genera una immagine predefinita
+                image_filename = generate_user_image(name, cognome, user_id)
+
+            # Inserisci i dati nella tabella appropriata
+            if user_type == 'docente':
+                query = "INSERT INTO Docente (docente_id, nome, cognome, email, password, image_path) VALUES (%s, %s, %s, %s, %s, %s)"
+                cursor.execute(query, (user_id, name, cognome, email, hashed_password.decode('utf-8'), image_filename))
+            else:
+                query = "INSERT INTO Studente (studente_id, nome, cognome, email, password, image_path) VALUES (%s, %s, %s, %s, %s, %s)"
+                cursor.execute(query, (user_id, name, cognome, email, hashed_password.decode('utf-8'), image_filename))
+
+            conn.commit()
+
+        except mysql.connector.Error as err:
+            flash(f'Errore durante la registrazione: {err}')
+            return redirect(url_for('registrati'))
+
+        finally:
+            # Chiudi il cursore e la connessione
+            cursor.close()
+            conn.close()
 
         # Imposta i dettagli dell'utente nella sessione
         session['user_id'] = user_id
         session['user_type'] = user_type
         session['user_name'] = name + " " + cognome
+        session['image'] = image_filename
 
         flash('Registrazione avvenuta con successo!')
         return redirect(url_for('dashboard'))

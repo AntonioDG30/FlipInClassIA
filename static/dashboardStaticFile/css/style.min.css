@@ -4243,4 +4243,9 @@ input:checked + .slider:before {
   color: #000;
 }
 
+.message-error {
+    color: red;
+    width: max-content;
+}
+
 /*# sourceMappingURL=style.min.css.map */
