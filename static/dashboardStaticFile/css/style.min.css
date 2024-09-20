@@ -1302,10 +1302,9 @@ button.disabled:focus {
 }
 
 
-
 .badge-disabled {
     color: #008000;
-    background-color: rgba( 110,170,94, .1)
+    background-color: rgba(110, 170, 94, .1)
 
 
 }
@@ -2894,7 +2893,7 @@ input:checked + .slider:before {
 }
 
 .darkmode .badge-disabled {
-    background-color: rgba(110,170,94, .1);
+    background-color: rgba(110, 170, 94, .1);
     color: #6eaa5e
 }
 
@@ -4233,19 +4232,60 @@ input:checked + .slider:before {
 }
 
 .toggle-icon {
-  cursor: pointer;
-  font-size: 1.2em;
-  color: #666;
-  transition: transform 0.3s;
+    cursor: pointer;
+    font-size: 1.2em;
+    color: #666;
+    transition: transform 0.3s;
 }
 
 .toggle-icon:hover {
-  color: #000;
+    color: #000;
 }
 
 .message-error {
     color: red;
     width: max-content;
+}
+
+/* Stile personalizzato per il bottone di upload */
+.custom-file-upload {
+    display: inline-block;
+    padding: 10px 20px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    border-radius: 5px;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+    text-align: center;
+}
+
+.custom-file-upload:hover {
+    background-color: #0056b3;
+}
+
+/* Nascondi l'input file */
+#profilePicture {
+    display: none;
+}
+
+/* Stile per l'anteprima dell'immagine */
+.image-preview {
+    display: block;
+    margin-top: 10px;
+    width: 150px;
+    height: 150px;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Centro l'anteprima orizzontalmente */
+.preview-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 10px;
 }
 
 /*# sourceMappingURL=style.min.css.map */
