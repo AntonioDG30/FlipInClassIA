@@ -1,18 +1,35 @@
+from sklearn.feature_extraction.text import TfidfVectorizer
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
+from pptx import Presentation
+import pdfplumber
 import mysql.connector
 import bcrypt
 import os
 import secrets
 import random
-
+import re
+import nltk
+nltk.download('all')
+from nltk.tokenize import sent_tokenize, word_tokenize
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 # Inizializza l'app Flask
 app = Flask(__name__)
 
-# Genera una chiave segreta casuale per la sessione dell'app (necessaria per le sessioni in Flask)
+# Genera una chiave segreta casuale per la sessione dell'app
 app.secret_key = secrets.token_bytes(32)
+
+# Percorso di upload
+UPLOAD_FOLDER = 'static/fileCaricati/'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Percorsi per le immagini
+IMAGES_PATH = "static/dashboardStaticFile/img/corsi"
+os.makedirs(IMAGES_PATH, exist_ok=True)
+USER_IMAGES_PATH = "static/dashboardStaticFile/img/utenti"
+os.makedirs(USER_IMAGES_PATH, exist_ok=True)
 
 
 # Funzione che gestisce la connessione al database MySQL
@@ -98,11 +115,6 @@ def dashboard():
         # Se l'utente non è loggato, mostra un messaggio e reindirizza alla pagina di login
         flash('Devi essere loggato per accedere alla dashboard.')
         return redirect(url_for('login'))
-
-
-# Definisce il percorso in cui verranno salvate le immagini dei corsi
-IMAGES_PATH = "static/dashboardStaticFile/img/corsi"
-os.makedirs(IMAGES_PATH, exist_ok=True)  # Crea la cartella se non esiste già
 
 
 # Funzione per generare un'immagine personalizzata per un corso
@@ -258,7 +270,7 @@ def indexCorso():
         conn = get_db_connection()
         if conn is None:
             return jsonify({
-                               "error": "Errore di connessione al database"}), 500  # Messaggio di errore in caso di fallimento della connessione
+                "error": "Errore di connessione al database"}), 500  # Messaggio di errore in caso di fallimento della connessione
 
         cursor = conn.cursor(dictionary=True)
 
@@ -274,9 +286,9 @@ def indexCorso():
 
         # Query per ottenere gli argomenti trattati in ogni lezione del corso
         query = ("SELECT ARG.nome_argomento, ARG.lezione_id "
-                  "FROM Lezione_argomento AS ARG, Corso AS C, Lezione AS L "
-                  "WHERE C.corso_id = %s "
-                  "AND C.corso_id = L.corso_id AND L.lezione_id = ARG.lezione_id ")
+                 "FROM Lezione_argomento AS ARG, Corso AS C, Lezione AS L "
+                 "WHERE C.corso_id = %s "
+                 "AND C.corso_id = L.corso_id AND L.lezione_id = ARG.lezione_id ")
         cursor.execute(query, (corso_id,))
         argomenti_lezioni = cursor.fetchall()  # Recupera gli argomenti delle lezioni
 
@@ -385,6 +397,7 @@ def professoriPartecipanti():
         flash('Devi essere loggato per accedere alla dashboard.')
     return redirect(url_for('login'))
 
+
 # Rotta per visualizzare e/o partecipare alle lezioni giornaliere del corso
 @app.route('/lezioni')
 def lezioni():
@@ -407,7 +420,7 @@ def lezioni():
         # Ottiene la data corrente per il confronto
         oggi = datetime.now().date()
 
-        query = ("SELECT D.nome, D.cognome, LE.descrizione, LE.flagAttività "
+        query = ("SELECT D.nome, D.cognome, LE.descrizione, LE.statoLezione, LE.lezione_id "
                  "FROM Lezione AS LE "
                  "JOIN Docente AS D ON LE.docente_id = D.docente_id "
                  "JOIN Corso AS C ON C.corso_id = LE.corso_id "
@@ -425,7 +438,7 @@ def lezioni():
         # Restituisce la pagina con l'elenco dei professori partecipanti ('professori_partecipanti.html')
         return render_template('lezioni.html', user_id=user_id, user_type=user_type,
                                corso_id=corso_id, lezioni=lezioni,
-                               docente_presidente=docente_presidente, nome_corso=nome_corso)
+                               docente_presidente=docente_presidente, nome_corso=nome_corso, oggi=oggi)
 
     else:
         # Se l'utente non è loggato, mostra un messaggio di errore e reindirizza alla pagina di login
@@ -591,10 +604,6 @@ def profilo():
         flash('Devi essere loggato per accedere alla dashboard.')
         return redirect(url_for('login'))
 
-# Percorso per le immagini profilo degli utenti
-USER_IMAGES_PATH = "static/dashboardStaticFile/img/utenti"
-os.makedirs(USER_IMAGES_PATH, exist_ok=True)
-
 
 # Rotta per la modifica del profilo utente
 @app.route('/modificaProfilo', methods=['GET', 'POST'])
@@ -680,6 +689,93 @@ def modificaProfilo():
     return redirect(url_for('login'))
 
 
-# Avvio dell'applicazione Flask in modalità di debug
+# Funzione per estrarre testo da PDF
+def estrai_testo_da_pdf(filepath):
+    testo = ""
+    with pdfplumber.open(filepath) as pdf:
+        for pagina in pdf.pages:
+            testo += pagina.extract_text() + "\n"
+    return testo
+
+
+# Funzione per estrarre testo da PPTX
+def estrai_testo_da_pptx(filepath):
+    testo = ""
+    prs = Presentation(filepath)
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if hasattr(shape, "text"):
+                testo += shape.text + "\n"
+    return testo
+
+
+# Funzione per pulire e segmentare il testo
+def pulisci_e_segmenta_testo(testo):
+    # Rimuove spazi in eccesso e caratteri non ASCII
+    testo_pulito = re.sub(r'[^\x00-\x7F]+', ' ', testo)  # Rimuove caratteri non ASCII
+    testo_pulito = re.sub(r'\s+', ' ', testo_pulito).strip()  # Rimuove spazi multipli e strip spazi iniziali e finali
+    frasi = sent_tokenize(testo_pulito)  # Segmenta in frasi
+    return frasi
+
+
+@app.route('/avviaLezioneProgrammata', methods=['POST'])
+def avviaLezioneProgrammata():
+    try:
+        if 'user_id' in session and session['user_type'] == 'docente':
+            docente_id = session['user_id']
+            print("Step 1: Verifica utente docente")
+
+            # Connessione al database
+            conn = get_db_connection()
+            if conn is None:
+                flash('Errore di connessione al database.', 'error')
+                return redirect(url_for('dashboard'))
+
+            cursor = conn.cursor()
+
+            # Verifica la presenza del file nel form
+            if 'file' not in request.files or request.files['file'].filename == '':
+                flash("Nessun file selezionato", 'error')
+                return redirect(url_for('dashboard'))
+
+            file = request.files['file']
+            lezione_id = request.form.get('lezione_id')
+
+            # Verifica estensione file
+            if file and (file.filename.endswith('.pdf') or file.filename.endswith('.pptx')):
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+                file.save(filepath)
+                print("Step 2: File salvato correttamente")
+
+                # Estrazione del testo dal file
+                if file.filename.endswith('.pdf'):
+                    testo = estrai_testo_da_pdf(filepath)
+                elif file.filename.endswith('.pptx'):
+                    testo = estrai_testo_da_pptx(filepath)
+
+                print("Step 3: Testo estratto")
+                print(f"Testo estratto:\n{testo}")
+
+                # Aggiornare lo stato della Lezione nel DB
+                #query = "UPDATE Lezione SET statoLezione = 'Avviata' WHERE lezione_id = %s"
+                #cursor.execute(query, (lezione_id,))
+                conn.commit()
+
+                cursor.close()
+                conn.close()
+                return redirect(url_for('dashboard'))
+
+            else:
+                flash("Formato file non valido. Si accettano solo PDF o PPTX", 'error')
+                return redirect(url_for('dashboard'))
+        else:
+            flash('Non sei autorizzato ad avviare una lezione.', 'error')
+            return redirect(url_for('dashboard'))
+    except Exception as e:
+        print(f"Errore durante l'avvio della lezione: {e}")
+        return "Internal Server Error", 500
+
+
+# Avvio dell'applicazione Flask
 if __name__ == '__main__':
     app.run(debug=True)
