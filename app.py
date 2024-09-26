@@ -31,7 +31,7 @@ USER_IMAGES_PATH = "static/dashboardStaticFile/img/utenti"
 os.makedirs(USER_IMAGES_PATH, exist_ok=True)
 
 # Configura la chiave API di OpenAI
-openai.api_key = "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"
+openai.api_key = ""
 
 
 # Funzione per estrarre testo da PDF
