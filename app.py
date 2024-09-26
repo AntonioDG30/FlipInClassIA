@@ -1,4 +1,4 @@
-from sklearn.feature_extraction.text import TfidfVectorizer
+import openai
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
@@ -11,9 +11,8 @@ import secrets
 import random
 import re
 import nltk
-nltk.download('all')
-from nltk.tokenize import sent_tokenize, word_tokenize
-from sklearn.feature_extraction.text import TfidfVectorizer
+
+nltk.download('punkt')  # Scarica solo il pacchetto necessario
 
 # Inizializza l'app Flask
 app = Flask(__name__)
@@ -30,6 +29,335 @@ IMAGES_PATH = "static/dashboardStaticFile/img/corsi"
 os.makedirs(IMAGES_PATH, exist_ok=True)
 USER_IMAGES_PATH = "static/dashboardStaticFile/img/utenti"
 os.makedirs(USER_IMAGES_PATH, exist_ok=True)
+
+# Configura la chiave API di OpenAI
+openai.api_key = "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"
+
+
+# Funzione per estrarre testo da PDF
+def estrai_testo_da_pdf(filepath):
+    testo = ""
+    with pdfplumber.open(filepath) as pdf:
+        for pagina in pdf.pages:
+            testo += pagina.extract_text() + "\n"
+    return testo
+
+
+# Funzione per estrarre testo da PPTX
+def estrai_testo_da_pptx(filepath):
+    testo = ""
+    prs = Presentation(filepath)
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if hasattr(shape, "text"):
+                testo += shape.text + "\n"
+    return testo
+
+
+# Funzione migliorata per pulire e segmentare il testo
+def pulisci_e_segmenta_testo(testo):
+    # Rimuovo caratteri non ASCII e spazi in eccesso
+    testo_pulito = re.sub(r'[^\x00-\x7F]+', ' ', testo)
+    testo_pulito = re.sub(r'\s+', ' ', testo_pulito).strip()
+
+    # Segmentazione del testo in frasi
+    frasi = nltk.sent_tokenize(testo_pulito, language="italian")
+
+    # Segmenta il testo in parti più piccole
+    segmenti = []
+    segmento_corrente = ""
+    token_count = 0
+
+    for frase in frasi:
+        num_tokens = len(frase.split())
+        if token_count + num_tokens <= 1500:  # Limita ogni segmento a circa 1500 parole
+            segmento_corrente += frase + " "
+            token_count += num_tokens
+        else:
+            segmenti.append(segmento_corrente.strip())
+            segmento_corrente = frase + " "
+            token_count = num_tokens
+
+    # Aggiunge l'ultimo segmento
+    if segmento_corrente:
+        segmenti.append(segmento_corrente.strip())
+
+    return segmenti
+
+
+# Funzione migliorata per generare macro-aree e questionario con gestione della troncatura
+def genera_macro_aree_e_questionario(testo):
+    # Segmenta il testo in parti più piccole
+    segmenti = pulisci_e_segmenta_testo(testo)
+
+    macro_aree = []
+    questionario = []
+
+    # Unisci solo i primi 2 segmenti e riduci il testo totale per evitare di superare il limite di token
+    testo_unificato = " ".join(segmenti[:2])[
+                      :2000]  # Riduci ulteriormente il testo totale a un massimo di 2000 caratteri
+
+    try:
+        # Richiesta per generare le 5 macro-aree più importanti
+        prompt_macro = (
+            f"Per favore, agisci come se fossi un professore universitario e ricava le 5 macro-aree/argomenti in italiano più importanti, "
+            f"Ogni macro-area dovrebbe essere nel formato 'Nome Argomento: Descrizione dell'argomento' e non numerare le macro-aree, "
+            f"della lezione in italiano riassunta nel seguente testo: {testo_unificato}")
+
+        response_macro = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system",
+                 "content": "Sei un professore universitario che genera macro-aree da un testo di lezione."},
+                {"role": "user", "content": prompt_macro}
+            ],
+            max_tokens=300,  # Limita i token di output
+            temperature=0.5,
+        )
+
+        # Supponiamo che l'output sia una lista di argomenti nel formato 'Nome Argomento: Descrizione'
+        macro_lines = response_macro['choices'][0]['message']['content'].strip().split('\n')
+        for line in macro_lines:
+            if ':' in line:
+                nome_argomento, descrizione_argomento = line.split(':', 1)  # Dividi in nome e descrizione
+                nome_argomento = nome_argomento.strip()
+                descrizione_argomento = descrizione_argomento.strip()
+                if nome_argomento and descrizione_argomento:
+                    macro_aree.append((nome_argomento, descrizione_argomento))
+
+        # Limita il numero di domande da generare tra 10 e 15
+        num_domande = random.randint(10, 15)
+        domande_generate = 0
+
+        # Suddividi ulteriormente il testo in segmenti più piccoli per la generazione del questionario
+        for segmento in segmenti:
+            if domande_generate >= num_domande:
+                break  # Ferma se abbiamo raggiunto il numero di domande richiesto
+
+            # Limita il segmento a un massimo di 1000 caratteri
+            segmento_limitato = segmento[:1000]
+
+            # Gestisci la generazione iterativa delle domande
+            while domande_generate < num_domande:
+                num_domande_richieste = min(5, num_domande - domande_generate)  # Richiedi tra 3 e 5 domande
+
+                # Richiesta per generare un blocco di domande per il segmento attuale
+                prompt_questionario = (
+                    f"Basandoti sul testo seguente, crea un questionario a risposta multipla con 4 opzioni di cui una sola è corretta. "
+                    f"Crea {num_domande_richieste} domande che variano su tutti gli argomenti del testo. Non numerare le domande. "
+                    f"Indica esplicitamente quale opzione è corretta alla fine di ogni domanda, nel formato 'Risposta corretta: X)': {segmento_limitato}")
+
+                response_questionario = openai.ChatCompletion.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system",
+                         "content": "Sei un professore universitario che crea questionari a risposta multipla basati su un testo."},
+                        {"role": "user", "content": prompt_questionario}
+                    ],
+                    max_tokens=500,  # Limita i token di output
+                    temperature=0.5,
+                )
+
+                # Analizza la risposta per estrarre le domande e le opzioni
+                question_lines = response_questionario['choices'][0]['message']['content'].strip().split('\n')
+                current_question = None
+                corretta_opzione = None
+
+                for line in question_lines:
+                    line = line.strip()
+                    if line.startswith(('1.', '2.', '3.', '4.', '5.')) or line.startswith(
+                            tuple(str(i) + '.' for i in range(1, 16))):  # Riconosce l'inizio di una nuova domanda
+                        if current_question:
+                            if corretta_opzione:
+                                # Trova e contrassegna l'opzione corretta in base all'indicazione dell'IA
+                                for opzione in current_question['opzioni']:
+                                    if opzione['testo_opzione'].startswith(corretta_opzione):
+                                        opzione['corretta'] = True
+                            questionario.append(current_question)
+                            domande_generate += 1
+                            if domande_generate >= num_domande:
+                                break  # Ferma se abbiamo raggiunto il numero di domande richiesto
+                        current_question = {"testo_domanda": line, "opzioni": []}
+                        corretta_opzione = None  # Reset per la nuova domanda
+                    elif line.startswith(('A)', 'B)', 'C)', 'D)')) and current_question:  # Riconosce una nuova opzione
+                        current_question['opzioni'].append({"testo_opzione": line, "corretta": False})
+                    elif line.startswith(
+                            'Risposta corretta:') and current_question:  # Riconosce l'indicazione della risposta corretta
+                        corretta_opzione = line.split(':')[
+                            1].strip()  # Estrae la risposta corretta (es. 'A)', 'B)', ecc.)
+
+                if current_question and domande_generate < num_domande:
+                    if corretta_opzione:
+                        for opzione in current_question['opzioni']:
+                            if opzione['testo_opzione'].startswith(corretta_opzione):
+                                opzione['corretta'] = True
+                    questionario.append(current_question)
+                    domande_generate += 1
+
+            # Ferma se abbiamo raggiunto il numero di domande richiesto
+            if domande_generate >= num_domande:
+                break
+
+    except Exception as e:
+        print(f"Errore durante la generazione: {e}")
+        return [], []
+
+    return macro_aree[:5], questionario  # Ritorna solo i primi 5 macro-argomenti e il questionario
+
+
+def salva_macro_aree_e_questionario(lezione_id, macro_aree, questionario):
+    conn = get_db_connection()
+    if conn is None:
+        print("Errore di connessione al database.")
+        return False
+
+    try:
+        cursor = conn.cursor()
+
+        # Salvataggio delle macro-aree nella tabella 'lezione_argomento'
+        for nome_argomento, descrizione_argomento in macro_aree:
+            cursor.execute("""
+                INSERT INTO lezione_argomento (lezione_id, nome_argomento, descrizione_argomento)
+                VALUES (%s, %s, %s)
+            """, (lezione_id, nome_argomento, descrizione_argomento))
+
+        # Creazione di un nuovo questionario per la lezione
+        cursor.execute("""
+            INSERT INTO questionario (lezione_id)
+            VALUES (%s)
+        """, (lezione_id,))
+        questionario_id = cursor.lastrowid
+
+        # Salvataggio delle domande e delle opzioni del questionario
+        for domanda in questionario:
+            # Inserisci la domanda
+            cursor.execute("""
+                INSERT INTO domanda (questionario_id, testo_domanda, corretta_opzione_id)
+                VALUES (%s, %s, NULL)  # L'opzione corretta sarà aggiornata successivamente
+            """, (questionario_id, domanda['testo_domanda']))
+            domanda_id = cursor.lastrowid
+
+            # Inserisci le opzioni della domanda
+            for opzione in domanda['opzioni']:
+                cursor.execute("""
+                    INSERT INTO opzione (domanda_id, testo_opzione)
+                    VALUES (%s, %s)
+                """, (domanda_id, opzione['testo_opzione']))
+
+                # Se questa è l'opzione corretta, aggiorna 'corretta_opzione_id' nella tabella 'domanda'
+                if opzione['corretta']:
+                    corretta_opzione_id = cursor.lastrowid
+                    cursor.execute("""
+                        UPDATE domanda
+                        SET corretta_opzione_id = %s
+                        WHERE domanda_id = %s
+                    """, (corretta_opzione_id, domanda_id))
+
+        # Commit delle operazioni sul database
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+
+    except mysql.connector.Error as err:
+        print(f"Errore durante l'inserimento nel database: {err}")
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return False
+
+
+# Rotta per avviare una Lezione Programmata o Immediata
+@app.route('/avviaLezione', methods=['POST'])
+def avviaLezione():
+    try:
+        if 'user_id' in session and session['user_type'] == 'docente':
+
+            conn = get_db_connection()
+            if conn is None:
+                # Se la connessione fallisce, mostra un messaggio di errore e reindirizza al login
+                flash('Errore di connessione al database.')
+                return redirect(url_for('login'))
+
+            # Cursore per eseguire le query SQL
+            cursor = conn.cursor(dictionary=True)
+
+            docente_id = session['user_id']
+
+            if 'type_start' in request.form and request.form['type_start'] == "Immediata":
+                corso_id = request.form.get('corso_id')
+                oggi = datetime.now().date()  # Ottiene la data odierna
+                descrizione = request.form.get('descrizione')
+                query = ("INSERT INTO `lezione`(`corso_id`, `docente_id`, `data`, `descrizione`, `statoLezione`) "
+                         "VALUES (%s, %s, %s, %s, 'Programmata')")
+                cursor.execute(query, (corso_id, docente_id, oggi, descrizione,))
+
+                query = (
+                    "SELECT `lezione_id` FROM `lezione` WHERE `corso_id` = %s AND `docente_id` = %s AND `data` = %s AND `statoLezione` = %s")
+                cursor.execute(query, (corso_id, docente_id, oggi, 'Programmata',))
+
+                # Ottiene i risultati della query (corsi)
+                lezione_id = cursor.fetchone()['lezione_id']
+            elif 'type_start' in request.form and request.form['type_start'] == "Programmata":
+                lezione_id = request.form.get('lezione_id')
+
+
+
+            # Verifica la presenza del file nel form
+            if 'file' not in request.files or request.files['file'].filename == '':
+                flash("Nessun file selezionato", 'error')
+                return redirect(url_for('dashboard'))
+
+            file = request.files['file']
+
+            # Verifica estensione file
+            if file and (file.filename.endswith('.pdf') or file.filename.endswith('.pptx')):
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+                file.save(filepath)
+
+                testo = ""
+
+                # Estrazione del testo dal file
+                if file.filename.endswith('.pdf'):
+                    testo = estrai_testo_da_pdf(filepath)
+                elif file.filename.endswith('.pptx'):
+                    testo = estrai_testo_da_pptx(filepath)
+
+                # Generazione delle macro-aree e del questionario in un unico blocco
+                macro_aree, questionario = genera_macro_aree_e_questionario(testo)
+
+                # Salvataggio nel database
+                if salva_macro_aree_e_questionario(lezione_id, macro_aree, questionario):
+                    flash("Lezione avviata con successo e questionario generato.", 'success')
+                else:
+                    flash("Errore durante il salvataggio nel database.", 'error')
+
+
+                query = "UPDATE `lezione` SET `statoLezione`= 'Avviata' WHERE lezione_id = %s"
+                cursor.execute(query, (lezione_id,))
+
+                cursor.close()  # Chiude il cursore
+                conn.close()  # Chiude la connessione al database
+
+                return redirect(url_for('dashboard'))
+
+            else:
+                flash("Formato file non valido. Si accettano solo PDF o PPTX", 'error')
+                return redirect(url_for('lezioni'))
+        else:
+            flash('Non sei autorizzato ad avviare una lezione.', 'error')
+            return redirect(url_for('dashboard'))
+    except Exception as e:
+        print(f"Errore durante l'avvio della lezione: {e}")
+        return "Internal Server Error", 500
+
+
+
+@app.route('/accediLezione', methods=['POST'])
+def accediLezione():
+    lezione_id = request.form['lezione_id']
+
+    return "ciao: " + lezione_id
 
 
 # Funzione che gestisce la connessione al database MySQL
@@ -687,93 +1015,6 @@ def modificaProfilo():
         return redirect(url_for('profilo'))
 
     return redirect(url_for('login'))
-
-
-# Funzione per estrarre testo da PDF
-def estrai_testo_da_pdf(filepath):
-    testo = ""
-    with pdfplumber.open(filepath) as pdf:
-        for pagina in pdf.pages:
-            testo += pagina.extract_text() + "\n"
-    return testo
-
-
-# Funzione per estrarre testo da PPTX
-def estrai_testo_da_pptx(filepath):
-    testo = ""
-    prs = Presentation(filepath)
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if hasattr(shape, "text"):
-                testo += shape.text + "\n"
-    return testo
-
-
-# Funzione per pulire e segmentare il testo
-def pulisci_e_segmenta_testo(testo):
-    # Rimuove spazi in eccesso e caratteri non ASCII
-    testo_pulito = re.sub(r'[^\x00-\x7F]+', ' ', testo)  # Rimuove caratteri non ASCII
-    testo_pulito = re.sub(r'\s+', ' ', testo_pulito).strip()  # Rimuove spazi multipli e strip spazi iniziali e finali
-    frasi = sent_tokenize(testo_pulito)  # Segmenta in frasi
-    return frasi
-
-
-@app.route('/avviaLezioneProgrammata', methods=['POST'])
-def avviaLezioneProgrammata():
-    try:
-        if 'user_id' in session and session['user_type'] == 'docente':
-            docente_id = session['user_id']
-            print("Step 1: Verifica utente docente")
-
-            # Connessione al database
-            conn = get_db_connection()
-            if conn is None:
-                flash('Errore di connessione al database.', 'error')
-                return redirect(url_for('dashboard'))
-
-            cursor = conn.cursor()
-
-            # Verifica la presenza del file nel form
-            if 'file' not in request.files or request.files['file'].filename == '':
-                flash("Nessun file selezionato", 'error')
-                return redirect(url_for('dashboard'))
-
-            file = request.files['file']
-            lezione_id = request.form.get('lezione_id')
-
-            # Verifica estensione file
-            if file and (file.filename.endswith('.pdf') or file.filename.endswith('.pptx')):
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-                file.save(filepath)
-                print("Step 2: File salvato correttamente")
-
-                # Estrazione del testo dal file
-                if file.filename.endswith('.pdf'):
-                    testo = estrai_testo_da_pdf(filepath)
-                elif file.filename.endswith('.pptx'):
-                    testo = estrai_testo_da_pptx(filepath)
-
-                print("Step 3: Testo estratto")
-                print(f"Testo estratto:\n{testo}")
-
-                # Aggiornare lo stato della Lezione nel DB
-                #query = "UPDATE Lezione SET statoLezione = 'Avviata' WHERE lezione_id = %s"
-                #cursor.execute(query, (lezione_id,))
-                conn.commit()
-
-                cursor.close()
-                conn.close()
-                return redirect(url_for('dashboard'))
-
-            else:
-                flash("Formato file non valido. Si accettano solo PDF o PPTX", 'error')
-                return redirect(url_for('dashboard'))
-        else:
-            flash('Non sei autorizzato ad avviare una lezione.', 'error')
-            return redirect(url_for('dashboard'))
-    except Exception as e:
-        print(f"Errore durante l'avvio della lezione: {e}")
-        return "Internal Server Error", 500
 
 
 # Avvio dell'applicazione Flask
