@@ -31,7 +31,7 @@ USER_IMAGES_PATH = "static/dashboardStaticFile/img/utenti"
 os.makedirs(USER_IMAGES_PATH, exist_ok=True)
 
 # Configura la chiave API di OpenAI
-openai.api_key = ""
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 
 # Funzione per estrarre testo da PDF
@@ -268,8 +268,8 @@ def salva_macro_aree_e_questionario(lezione_id, macro_aree, questionario):
 
 
 # Rotta per avviare una Lezione Programmata o Immediata
-@app.route('/avviaLezione', methods=['POST'])
-def avviaLezione():
+@app.route('/avvia_lezione', methods=['POST'])
+def avvia_lezione():
     try:
         if 'user_id' in session and session['user_type'] == 'docente':
 
@@ -353,11 +353,46 @@ def avviaLezione():
 
 
 
-@app.route('/accediLezione', methods=['POST'])
-def accediLezione():
+@app.route('/accedi_lezione', methods=['POST'])
+def accedi_lezione():
     lezione_id = request.form['lezione_id']
 
     return "ciao: " + lezione_id
+
+# Rotta per avviare una Lezione Programmata o Immediata
+@app.route('/programma_lezione', methods=['POST'])
+def programma_lezione():
+    try:
+        if 'user_id' in session and session['user_type'] == 'docente':
+
+            conn = get_db_connection()
+            if conn is None:
+                # Se la connessione fallisce, mostra un messaggio di errore e reindirizza al login
+                flash('Errore di connessione al database.')
+                return redirect(url_for('login'))
+
+            # Cursore per eseguire le query SQL
+            cursor = conn.cursor(dictionary=True)
+
+            docente_id = session['user_id']
+            corso_id = request.form.get('corso_id')
+            data = request.form.get('date')
+            descrizione = request.form.get('descrizione')
+            query = ("INSERT INTO `lezione`(`corso_id`, `docente_id`, `data`, `descrizione`, `statoLezione`) "
+                     "VALUES (%s, %s, %s, %s, 'Programmata')")
+            cursor.execute(query, (corso_id, docente_id, data, descrizione,))
+
+
+            cursor.close()  # Chiude il cursore
+            conn.close()  # Chiude la connessione al database
+
+            return redirect(url_for('indexCorso', corso_id=corso_id))
+        else:
+            flash('Non sei autorizzato a programmare una lezione.', 'error')
+            return redirect(url_for('dashboard'))
+    except Exception as e:
+        print(f"Errore durante programmazione della lezione: {e}")
+        return "Internal Server Error", 500
 
 
 # Funzione che gestisce la connessione al database MySQL
@@ -602,6 +637,14 @@ def indexCorso():
 
         cursor = conn.cursor(dictionary=True)
 
+        query = ("SELECT COUNT(LE.lezione_id) AS NumLezioni "
+                 "FROM Lezione AS LE "
+                 "JOIN Docente AS D ON LE.docente_id = D.docente_id "
+                 "JOIN Corso AS C ON C.corso_id = LE.corso_id "
+                 "WHERE C.corso_id = %s AND LE.data > %s")
+        cursor.execute(query, (corso_id, oggi))
+        NumLezioni = cursor.fetchone()['NumLezioni']  # Recupera tutte le lezioni del corso
+
         # Query per ottenere il calendario delle lezioni del corso
         query = ("SELECT D.nome, D.cognome, LE.data, LE.descrizione, LE.lezione_id "
                  "FROM Lezione AS LE "
@@ -628,7 +671,7 @@ def indexCorso():
         conn.close()
 
         # Restituisce la pagina del corso ('indexCorso.html') con tutte le informazioni necessarie
-        return render_template('indexCorso.html', user_id=user_id, user_type=user_type,
+        return render_template('indexCorso.html', user_id=user_id, user_type=user_type, NumLezioni=NumLezioni,
                                nome_corso=nome_corso, corso_id=corso_id, calendario_lezioni=calendario_lezioni,
                                oggi=oggi, argomenti_lezioni=argomenti_lezioni, docente_presidente=docente_presidente)
 
@@ -736,6 +779,7 @@ def lezioni():
 
         # Recupera il corso_id passato come parametro dalla query string
         corso_id = request.args.get('corso_id')
+        print(corso_id)
 
         # Connessione al database
         conn = get_db_connection()
@@ -748,12 +792,21 @@ def lezioni():
         # Ottiene la data corrente per il confronto
         oggi = datetime.now().date()
 
-        query = ("SELECT D.nome, D.cognome, LE.descrizione, LE.statoLezione, LE.lezione_id "
-                 "FROM Lezione AS LE "
-                 "JOIN Docente AS D ON LE.docente_id = D.docente_id "
-                 "JOIN Corso AS C ON C.corso_id = LE.corso_id "
-                 "WHERE C.corso_id = %s AND LE.data = %s ")
-        cursor.execute(query, (corso_id, oggi))
+        if user_type == "docente":
+            query = ("SELECT D.nome, D.cognome, LE.descrizione, LE.statoLezione, LE.lezione_id "
+                     "FROM Lezione AS LE "
+                     "JOIN Docente AS D ON LE.docente_id = D.docente_id "
+                     "JOIN Corso AS C ON C.corso_id = LE.corso_id "
+                     "WHERE C.corso_id = %s AND LE.data = %s AND LE.docente_id = %s ")
+            cursor.execute(query, (corso_id, oggi, user_id))
+        else:
+            query = ("SELECT D.nome, D.cognome, LE.descrizione, LE.statoLezione, LE.lezione_id "
+                     "FROM Lezione AS LE "
+                     "JOIN Docente AS D ON LE.docente_id = D.docente_id "
+                     "JOIN Corso AS C ON C.corso_id = LE.corso_id "
+                     "WHERE C.corso_id = %s AND LE.data = %s")
+            cursor.execute(query, (corso_id, oggi,))
+
         lezioni = cursor.fetchall()  # Recupera tutte le lezioni del corso
 
         docente_presidente = ottieniProfessorePresidente(corso_id)  # Ottiene il docente responsabile del corso
