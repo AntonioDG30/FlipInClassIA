@@ -351,13 +351,81 @@ def avvia_lezione():
         print(f"Errore durante l'avvio della lezione: {e}")
         return "Internal Server Error", 500
 
+def lezioni():
+    # Controlla se l'utente è loggato
+    if 'user_id' in session:
+        user_id = session['user_id']  # Recupera l'ID utente dalla sessione
+        user_type = session['user_type']  # Recupera il tipo di utente (studente o docente)
+
+        # Recupera il corso_id passato come parametro dalla query string
+        corso_id = request.args.get('corso_id')
+        print(corso_id)
+
+        # Connessione al database
+        conn = get_db_connection()
+        if conn is None:
+            # In caso di errore nella connessione, restituisce un messaggio di errore come JSON
+            return jsonify({"error": "Errore di connessione al database"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+
+        # Ottiene la data corrente per il confronto
+        oggi = datetime.now().date()
+
+        if user_type == "docente":
+            query = ("SELECT D.nome, D.cognome, LE.descrizione, LE.statoLezione, LE.lezione_id "
+                     "FROM Lezione AS LE "
+                     "JOIN Docente AS D ON LE.docente_id = D.docente_id "
+                     "JOIN Corso AS C ON C.corso_id = LE.corso_id "
+                     "WHERE C.corso_id = %s AND LE.data = %s AND LE.docente_id = %s ")
+            cursor.execute(query, (corso_id, oggi, user_id))
+        else:
+            query = ("SELECT D.nome, D.cognome, LE.descrizione, LE.statoLezione, LE.lezione_id "
+                     "FROM Lezione AS LE "
+                     "JOIN Docente AS D ON LE.docente_id = D.docente_id "
+                     "JOIN Corso AS C ON C.corso_id = LE.corso_id "
+                     "WHERE C.corso_id = %s AND LE.data = %s")
+            cursor.execute(query, (corso_id, oggi,))
+
+        lezioni = cursor.fetchall()  # Recupera tutte le lezioni del corso
+
+        docente_presidente = ottieniProfessorePresidente(corso_id)  # Ottiene il docente responsabile del corso
+        nome_corso = ottieniNomeCorso(corso_id)  # Ottiene il nome del corso
+
+        # Chiude il cursore e la connessione
+        cursor.close()
+        conn.close()
+
+        # Restituisce la pagina con l'elenco dei professori partecipanti ('professori_partecipanti.html')
+        return render_template('indexLezioni.html', user_id=user_id, user_type=user_type,
+                               corso_id=corso_id, lezioni=lezioni,
+                               docente_presidente=docente_presidente, nome_corso=nome_corso, oggi=oggi)
+
+    else:
+        # Se l'utente non è loggato, mostra un messaggio di errore e reindirizza alla pagina di login
+        flash('Devi essere loggato per accedere alla dashboard.')
+    return redirect(url_for('login'))
 
 
 @app.route('/accedi_lezione', methods=['POST'])
 def accedi_lezione():
-    lezione_id = request.form['lezione_id']
+    if 'user_id' in session:
+        lezione_id = request.form['lezione_id']
+        print(lezione_id)
+        # Recupera il corso_id passato come parametro dalla query string
+        corso_id = request.form.get('corso_id')
+        print(corso_id)
+        user_id = session['user_id']  # Recupera l'ID utente dalla sessione
+        user_type = session['user_type']  # Recupera il tipo di utente (studente o docente)
+        docente_presidente = ottieniProfessorePresidente(corso_id)  # Ottiene il docente responsabile del corso
+        nome_corso = ottieniNomeCorso(corso_id)  # Ottiene il nome del corso
 
-    return "ciao: " + lezione_id
+        return render_template('lezioneStudente.html', user_id=user_id, user_type=user_type,
+                                   corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso)
+    else:
+        # Se l'utente non è loggato, mostra un messaggio di errore e reindirizza alla pagina di login
+        flash('Devi essere loggato per accedere alla lezione.')
+        return redirect(url_for('login'))
 
 # Rotta per avviare una Lezione Programmata o Immediata
 @app.route('/programma_lezione', methods=['POST'])
@@ -817,7 +885,7 @@ def lezioni():
         conn.close()
 
         # Restituisce la pagina con l'elenco dei professori partecipanti ('professori_partecipanti.html')
-        return render_template('lezioni.html', user_id=user_id, user_type=user_type,
+        return render_template('indexLezioni.html', user_id=user_id, user_type=user_type,
                                corso_id=corso_id, lezioni=lezioni,
                                docente_presidente=docente_presidente, nome_corso=nome_corso, oggi=oggi)
 
