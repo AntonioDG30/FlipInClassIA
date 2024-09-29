@@ -172,6 +172,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   })();
 
+
+  window.myApp = window.myApp || {}; // Crea un oggetto globale se non esiste
+
+
   (function () {
     Chart.defaults.backgroundColor = '#000';
     var darkMode = localStorage.getItem('darkMode');
@@ -180,11 +184,13 @@ document.addEventListener('DOMContentLoaded', function () {
     var enableDarkMode = function enableDarkMode() {
       document.body.classList.add('darkmode');
       localStorage.setItem('darkMode', 'enabled');
+      myApp.darkModePubblic = darkMode;
     };
 
     var disableDarkMode = function disableDarkMode() {
       document.body.classList.remove('darkmode');
       localStorage.setItem('darkMode', null);
+      myApp.darkModePubblic = darkMode;
     };
 
     if (darkMode === 'enabled') {

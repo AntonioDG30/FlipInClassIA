@@ -1,3 +1,6 @@
+-- Eliminazione del vecchio Database
+DROP DATABASE IF EXISTS FlipInClassIA_DB;
+
 -- Creazione del Database
 CREATE DATABASE FlipInClassIA_DB;
 
@@ -8,10 +11,11 @@ USE FlipInClassIA_DB;
 CREATE TABLE Docente
 (
     docente_id VARCHAR(100) PRIMARY KEY,
-    nome       VARCHAR(100),
-    cognome    VARCHAR(100),
-    email      VARCHAR(100),
-    password   VARCHAR(100)
+    nome       VARCHAR(100) NOT NULL,
+    cognome    VARCHAR(100) NOT NULL,
+    email      VARCHAR(100) NOT NULL,
+    password   VARCHAR(100) NOT NULL,
+    image_path varchar(100)
 );
 
 -- Creazione della tabella Corsi
@@ -20,75 +24,86 @@ CREATE TABLE Corso
     corso_id    VARCHAR(100) PRIMARY KEY,
     nome        VARCHAR(100),
     descrizione TEXT,
-    docente_id  VARCHAR(100),
-    image_path  VARCHAR(100),
-    FOREIGN KEY (docente_id) REFERENCES Docente (docente_id)
+    image_path  VARCHAR(100)
 );
 
 -- Creazione della tabella Studenti
 CREATE TABLE Studente
 (
     studente_id VARCHAR(100) PRIMARY KEY,
-    nome        VARCHAR(100),
-    cognome     VARCHAR(100),
-    email       VARCHAR(100),
-    password    VARCHAR(100)
+    nome        VARCHAR(100) NOT NULL,
+    cognome     VARCHAR(100) NOT NULL,
+    email       VARCHAR(100) NOT NULL,
+    password    VARCHAR(100) NOT NULL,
+    image_path  varchar(100)
+);
+
+-- Creazione della tabella Lavora
+CREATE TABLE Lavora
+(
+    docente_id   VARCHAR(100) NOT NULL,
+    corso_id     VARCHAR(100) NOT NULL,
+    proprietario tinyint      NOT NULL,
+    FOREIGN KEY (docente_id) REFERENCES Docente (docente_id),
+    FOREIGN KEY (corso_id) REFERENCES Corso (corso_id)
 );
 
 -- Creazione della tabella Partecipa
 CREATE TABLE Partecipa
 (
-    studente_id VARCHAR(100),
-    corso_id    VARCHAR(100),
+    studente_id VARCHAR(100) NOT NULL,
+    corso_id    VARCHAR(100) NOT NULL,
     FOREIGN KEY (studente_id) REFERENCES Studente (studente_id),
     FOREIGN KEY (corso_id) REFERENCES Corso (corso_id)
 );
 
--- Creazione della tabella Argomenti
-CREATE TABLE Argomento
+-- Creazione della tabella AttivitàLezione
+CREATE TABLE AttivitàLezione
 (
-    argomento_id INT AUTO_INCREMENT PRIMARY KEY,
-    nome         VARCHAR(100),
-    descrizione  TEXT
+    statoLezione varchar(100) NOT NULL PRIMARY KEY
 );
 
 -- Creazione della tabella Lezioni
 CREATE TABLE Lezione
 (
-    lezione_id INT AUTO_INCREMENT PRIMARY KEY,
-    corso_id   INT,
-    data       DATE,
-    FOREIGN KEY (corso_id) REFERENCES Corso (corso_id)
+    lezione_id   INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+    corso_id     VARCHAR(100)                   NOT NULL,
+    docente_id   VARCHAR(100)                   NOT NULL,
+    data         DATE                           NOT NULL,
+    descrizione  TEXT                           NOT NULL,
+    statoLezione VARCHAR(100)                   NOT NULL,
+    FOREIGN KEY (corso_id) REFERENCES Corso (corso_id),
+    FOREIGN KEY (docente_id) REFERENCES Docente (docente_id),
+    FOREIGN KEY (statoLezione) REFERENCES AttivitàLezione (statoLezione)
 );
 
 -- Creazione della tabella Lezione_Argomenti
 CREATE TABLE Lezione_Argomento
 (
-    lezione_argomento_id INT AUTO_INCREMENT PRIMARY KEY,
-    lezione_id           INT,
-    argomento_id         INT,
-    tempo_trascorso      INT, -- Tempo dedicato a questo argomento nella lezione in minuti
-    FOREIGN KEY (lezione_id) REFERENCES Lezione (lezione_id),
-    FOREIGN KEY (argomento_id) REFERENCES Argomento (argomento_id)
+    lezione_argomento_id  INT AUTO_INCREMENT PRIMARY KEY,
+    lezione_id            INT          NOT NULL,
+    nome_argomento        VARCHAR(100) NOT NULL,
+    descrizione_argomento TEXT         NOT NULL,
+    FOREIGN KEY (lezione_id) REFERENCES Lezione (lezione_id)
 );
 
 -- Creazione della tabella Questionari
 CREATE TABLE Questionario
 (
-    questionario_id INT AUTO_INCREMENT PRIMARY KEY,
-    lezione_id      INT,
+    questionario_id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+    lezione_id      INT                            NOT NULL,
     FOREIGN KEY (lezione_id) REFERENCES Lezione (lezione_id)
 );
 
--- Creazione della tabella Domande
+-- Creazione della tabella Domanda
 CREATE TABLE Domanda
 (
-    domanda_id           INT AUTO_INCREMENT PRIMARY KEY,
-    questionario_id      INT,
-    testo_domanda        TEXT,
-    corretta_opzione_id  INT,
-    argomento_id         INT,   -- Riferimento all'argomento trattato dalla domanda
-    difficolta_percepita FLOAT, -- Difficoltà percepita della domanda
+    domanda_id           INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+    questionario_id      INT                            NOT NULL,
+    testo_domanda        TEXT                           NOT NULL,
+    corretta_opzione_id  INT                            NOT NULL,
+    argomento_id         INT                            NOT NULL, -- Riferimento all'argomento trattato dalla domanda
+    difficolta_percepita FLOAT,                                   -- Difficoltà percepita della domanda
     FOREIGN KEY (questionario_id) REFERENCES Questionario (questionario_id),
     FOREIGN KEY (argomento_id) REFERENCES Argomento (argomento_id)
 );
@@ -96,10 +111,10 @@ CREATE TABLE Domanda
 -- Creazione della tabella Opzioni
 CREATE TABLE Opzione
 (
-    opzione_id                INT AUTO_INCREMENT PRIMARY KEY,
-    domanda_id                INT,
-    testo_opzione             TEXT,
-    risposte_errate_frequenza INT DEFAULT 0, -- Frequenza con cui questa opzione è stata scelta come risposta errata
+    opzione_id                INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+    domanda_id                INT                            NOT NULL,
+    testo_opzione             TEXT                           NOT NULL,
+    risposte_errate_frequenza INT DEFAULT 0                  NOT NULL, -- Frequenza con cui questa opzione è stata scelta come risposta errata
     FOREIGN KEY (domanda_id) REFERENCES Domanda (domanda_id)
 );
 
