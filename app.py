@@ -290,12 +290,12 @@ def avvia_lezione():
                 corso_id = request.form.get('corso_id')
                 oggi = datetime.now().date()  # Ottiene la data odierna
                 descrizione = request.form.get('descrizione')
-                query = ("INSERT INTO `lezione`(`corso_id`, `docente_id`, `data`, `descrizione`, `statoLezione`) "
+                query = ("INSERT INTO lezione(corso_id, docente_id, data, descrizione, statoLezione) "
                          "VALUES (%s, %s, %s, %s, '1')")
                 cursor.execute(query, (corso_id, docente_id, oggi, descrizione,))
 
                 query = (
-                    "SELECT `lezione_id` FROM `lezione` WHERE `corso_id` = %s AND `docente_id` = %s AND `data` = %s AND `statoLezione` = %s")
+                    "SELECT lezione_id FROM lezione WHERE corso_id = %s AND docente_id = %s AND data = %s AND statoLezione = %s")
                 cursor.execute(query, (corso_id, docente_id, oggi, '1',))
 
                 # Ottiene i risultati della query (corsi)
@@ -332,7 +332,7 @@ def avvia_lezione():
                 else:
                     flash("Errore durante il salvataggio nel database.", 'error')
 
-                query = "UPDATE `lezione` SET `statoLezione`= '2' WHERE lezione_id = %s"
+                query = "UPDATE lezione SET statoLezione= '2' WHERE lezione_id = %s"
                 cursor.execute(query, (lezione_id,))
 
                 cursor.close()  # Chiude il cursore
@@ -349,61 +349,6 @@ def avvia_lezione():
     except Exception as e:
         print(f"Errore durante l'avvio della lezione: {e}")
         return "Internal Server Error", 500
-
-
-def lezioni():
-    # Controlla se l'utente è loggato
-    if 'user_id' in session:
-        user_id = session['user_id']  # Recupera l'ID utente dalla sessione
-        user_type = session['user_type']  # Recupera il tipo di utente (studente o docente)
-
-        # Recupera il corso_id passato come parametro dalla query string
-        corso_id = request.args.get('corso_id')
-
-        # Connessione al database
-        conn = get_db_connection()
-        if conn is None:
-            # In caso di errore nella connessione, restituisce un messaggio di errore come JSON
-            return jsonify({"error": "Errore di connessione al database"}), 500
-
-        cursor = conn.cursor(dictionary=True)
-
-        # Ottiene la data corrente per il confronto
-        oggi = datetime.now().date()
-
-        if user_type == "docente":
-            query = ("SELECT D.nome, D.cognome, LE.descrizione, LE.statoLezione, LE.lezione_id "
-                     "FROM Lezione AS LE "
-                     "JOIN Docente AS D ON LE.docente_id = D.docente_id "
-                     "JOIN Corso AS C ON C.corso_id = LE.corso_id "
-                     "WHERE C.corso_id = %s AND LE.data = %s AND LE.docente_id = %s ")
-            cursor.execute(query, (corso_id, oggi, user_id))
-        else:
-            query = ("SELECT D.nome, D.cognome, LE.descrizione, LE.statoLezione, LE.lezione_id "
-                     "FROM Lezione AS LE "
-                     "JOIN Docente AS D ON LE.docente_id = D.docente_id "
-                     "JOIN Corso AS C ON C.corso_id = LE.corso_id "
-                     "WHERE C.corso_id = %s AND LE.data = %s")
-            cursor.execute(query, (corso_id, oggi,))
-
-        lezioni = cursor.fetchall()  # Recupera tutte le lezioni del corso
-
-        docente_presidente = ottieniProfessorePresidente(corso_id)  # Ottiene il docente responsabile del corso
-        nome_corso = ottieniNomeCorso(corso_id)  # Ottiene il nome del corso
-
-        # Chiude il cursore e la connessione
-        cursor.close()
-        conn.close()
-
-        # Restituisce la pagina con l'elenco dei professori partecipanti ('professori_partecipanti.html')
-        return render_template('indexLezioni.html', user_id=user_id, user_type=user_type,
-                               corso_id=corso_id, lezioni=lezioni,
-                               docente_presidente=docente_presidente, nome_corso=nome_corso, oggi=oggi)
-
-    else:
-        # Se l'utente non è loggato, mostra un messaggio di errore e reindirizza alla pagina di login
-        flash('Devi essere loggato per accedere alla dashboard.')
-    return redirect(url_for('login'))
 
 
 @app.route('/accedi_lezione', methods=['POST'])
@@ -452,7 +397,7 @@ def accedi_lezione():
 
             # 2. Ottenere le domande e le opzioni della lezione
             query_domande = """
-                                        SELECT d.domanda_id, d.testo_domanda
+                                        SELECT d.domanda_id, d.testo_domanda, d.corretta_opzione_id
                                         FROM Domanda d
                                         JOIN Questionario q ON d.questionario_id = q.questionario_id
                                         WHERE q.lezione_id = %s
@@ -516,7 +461,7 @@ def aggiorna_dati():
 
     # 2. Ottenere le domande e le opzioni della lezione
     query_domande = """
-        SELECT d.domanda_id, d.testo_domanda
+        SELECT d.domanda_id, d.testo_domanda, d.corretta_opzione_id
         FROM Domanda d
         JOIN Questionario q ON d.questionario_id = q.questionario_id
         WHERE q.lezione_id = %s
@@ -572,7 +517,7 @@ def programma_lezione():
             corso_id = request.form.get('corso_id')
             data = request.form.get('date')
             descrizione = request.form.get('descrizione')
-            query = ("INSERT INTO `lezione`(`corso_id`, `docente_id`, `data`, `descrizione`, `statoLezione`) "
+            query = ("INSERT INTO lezione(corso_id, docente_id, data, descrizione, statoLezione) "
                      "VALUES (%s, %s, %s, %s, '1')")
             cursor.execute(query, (corso_id, docente_id, data, descrizione,))
 

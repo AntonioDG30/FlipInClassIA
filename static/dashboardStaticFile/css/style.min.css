@@ -4526,4 +4526,209 @@ input:checked + .slider:before {
     border: 2px solid #388e3c;
 }
 
+/* Stile per l'estetica della pagina lezioneDocenti */
+.lezione-docente-container {
+    padding: 40px 80px;
+}
+
+.lezione-docente-white-block {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.lezione-docente-section-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+/* Layout delle sezioni affiancate (domande e controlli) */
+.lezione-docente-flex-container {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.lezione-docente-flex-container .lezione-docente-section {
+    flex: 1;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+}
+
+/* Stile per lo slider verticale delle domande */
+.lezione-docente-question-slider {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+/* Miglioramento estetico della sezione delle domande */
+.lezione-docente-question-block {
+    background-color: #f4f4f9;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.lezione-docente-question-block h3 {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.lezione-docente-question-block ul {
+    list-style: none;
+    padding: 0;
+}
+
+.lezione-docente-question-block ul li {
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.lezione-docente-question-block ul li:hover {
+    background-color: #e6e6ff;
+}
+
+/* Evidenziazione della risposta corretta */
+.lezione-docente-correct-answer {
+    background-color: #d4edda; /* Verde chiaro */
+    color: #155724; /* Verde scuro */
+    font-weight: bold;
+    border-left: 5px solid #28a745; /* Bordo verde per evidenziare */
+    padding-left: 10px;
+    position: relative;
+}
+
+/* Icona di spunta per la risposta corretta */
+.lezione-docente-check-icon {
+    color: #28a745;
+    margin-right: 5px;
+    position: absolute;
+    left: -25px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Modalità scura per la risposta corretta */
+.darkmode .lezione-docente-correct-answer {
+    background-color: #355a3a; /* Verde scuro */
+    color: #b2fab4; /* Verde chiaro */
+    border-left: 5px solid #5cb85c;
+}
+
+.darkmode .lezione-docente-check-icon {
+    color: #5cb85c;
+}
+
+
+/* Stile per i pulsanti di controllo */
+.lezione-docente-control-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.lezione-docente-control-buttons button {
+    padding: 10px;
+    border-radius: 5px;
+    border: none;
+    background-color: var(--button-bg-color, #007bff);
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.lezione-docente-control-buttons button:hover {
+    background-color: var(--button-hover-bg-color, #0056b3);
+}
+
+/* Tabella degli studenti */
+.lezione-docente-users-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.lezione-docente-users-table th,
+.lezione-docente-users-table td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.lezione-docente-users-table th {
+    background-color: #f1f1f1;
+    font-weight: bold;
+}
+
+/* Modalità scura */
+.darkmode .lezione-docente-white-block {
+    background-color: var(--dark-bg-color, #222235);
+    color: var(--dark-text-color, #e0e0e0);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.darkmode .lezione-docente-section-title {
+    color: var(--dark-text-color, #2f49d1);
+}
+
+.darkmode .lezione-docente-question-block {
+    background-color: #2c2c42;
+    color: #e0e0e0;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.darkmode .lezione-docente-question-block h3 {
+    color: var(--dark-text-color, #ffffff);
+}
+
+.darkmode .lezione-docente-question-block ul li {
+    background-color: #333;
+    color: #e0e0e0;
+}
+
+.darkmode .lezione-docente-question-slider {
+    background-color: var(--dark-section-bg-color, #222235);
+    color: var(--dark-text-color, #ffffff);
+}
+
+.darkmode .lezione-docente-correct-answer {
+    background-color: #355a3a;
+    color: #b2fab4;
+    border-left: 5px solid #5cb85c;
+}
+
+.darkmode .lezione-docente-check-icon {
+    color: #5cb85c;
+}
+
+.darkmode .lezione-docente-control-buttons button {
+    background-color: var(--dark-button-bg-color, #222235);
+    color: var(--dark-text-color, #ffffff);
+}
+
+.darkmode .lezione-docente-control-buttons button:hover {
+    background-color: var(--dark-button-hover-bg-color, #777);
+}
+
+.darkmode .lezione-docente-users-table th {
+    background-color: var(--dark-table-header-bg-color, #444);
+}
+
+.darkmode .lezione-docente-users-table td {
+    background-color: var(--dark-table-cell-bg-color, #2c2c42);
+    color: var(--dark-text-color, #ffffff);
+}
+
+
+
 /*# sourceMappingURL=style.min.css.map */
