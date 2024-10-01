@@ -1,0 +1,29 @@
+<nav class="main-nav--bg">
+    <div class="container main-nav">
+        <div class="main-nav-start">
+            <div class="logo-wrapper" title="Home">
+                <span class="sr-only">Home</span>
+                <span class="icon logo" aria-hidden="true"></span>
+                <div class="logo-text">
+                    <span class="logo-title-lezione">FlipInClassIA</span>
+                </div>
+            </div>
+        </div>
+        <div class="main-nav-end">
+            <button class="theme-switcher gray-circle-btn" type="button"
+                    title="Switch theme" id="toggleDarkMode">
+                <span class="sr-only">Switch theme</span>
+                <i class="sun-icon" data-feather="sun" aria-hidden="true"></i>
+                <i class="moon-icon" data-feather="moon" aria-hidden="true"></i>
+            </button>
+            <div class="nav-user-wrapper">
+                <span class="nav-user-img">
+                    <picture>
+                        <img src="static/dashboardStaticFile/img/utenti/{{ session['image'] }}"
+                             alt="User name">
+                    </picture>
+                </span>
+            </div>
+        </div>
+    </div>
+</nav>

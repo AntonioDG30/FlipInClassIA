@@ -1671,7 +1671,19 @@ label {
     font-size: 14px;
     font-weight: 700;
     line-height: 1.4;
-    letter-spacing: .86px
+    letter-spacing: .86px;
+}
+
+.logo-title-lezione {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: .86px;
+    color: #0a0a0a;
+}
+
+.darkmode .logo-title-lezione {
+    color: #ffffff;
 }
 
 .logo-subtitle {
@@ -3344,7 +3356,7 @@ input:checked + .slider:before {
         padding-bottom: 40px
     }
 
-    .main-nav .sidebar-toggle, .sidebar.hidden .category__btn {
+    main-nav. .sidebar-toggle, .sidebar.hidden .category__btn {
         display: none
     }
 
@@ -3541,12 +3553,7 @@ input:checked + .slider:before {
         left: 0
     }
 
-    .main-nav {
-        -webkit-box-orient: horizontal;
-        -webkit-box-direction: reverse;
-        -ms-flex-direction: row-reverse;
-        flex-direction: row-reverse
-    }
+
 
     .sort-bar {
         padding: 20px
@@ -3593,35 +3600,6 @@ input:checked + .slider:before {
     }
 }
 
-@media (max-width: 767.98px) {
-    .main-nav {
-        -webkit-box-orient: vertical;
-        -webkit-box-direction: reverse;
-        -ms-flex-direction: column-reverse;
-        flex-direction: column-reverse
-    }
-
-    .main-nav-start, .main-nav-start input {
-        width: 100%;
-    }
-
-    .main-nav-end {
-        margin-bottom: 20px;
-        -webkit-box-pack: justify;
-        -ms-flex-pack: justify;
-        justify-content: space-between;
-        width: 100%
-    }
-
-    .sort-bar {
-        padding-bottom: 10px
-    }
-
-    .sort-bar-end .select-wrapper {
-        width: 48%;
-        margin-bottom: 10px
-    }
-}
 
 @media (max-width: 575.98px) {
     .footer {
@@ -4361,14 +4339,14 @@ input:checked + .slider:before {
     top: 50%; /* Posiziona verticalmente al centro */
 }
 
-.quiz-container-unique
-{
-    transform: translateY(-90%); /* Trasla verso l'alto per centrare verticalmente */
+.quiz-container-unique {
+    transform: translateY(-60%); /* Trasla verso l'alto per centrare verticalmente */
 }
 
 .review-container-unique {
-    transform: translateY(-60%); /* Trasla verso l'alto per centrare verticalmente */
+    transform: translateY(-50%); /* Trasla verso l'alto per centrare verticalmente */
 }
+
 
 
 .dark-mode .quiz-container-unique, .dark-mode .review-container-unique {

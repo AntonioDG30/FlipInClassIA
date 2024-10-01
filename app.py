@@ -289,12 +289,12 @@ def avvia_lezione():
                 oggi = datetime.now().date()  # Ottiene la data odierna
                 descrizione = request.form.get('descrizione')
                 query = ("INSERT INTO `lezione`(`corso_id`, `docente_id`, `data`, `descrizione`, `statoLezione`) "
-                         "VALUES (%s, %s, %s, %s, 'Programmata')")
+                         "VALUES (%s, %s, %s, %s, '1')")
                 cursor.execute(query, (corso_id, docente_id, oggi, descrizione,))
 
                 query = (
                     "SELECT `lezione_id` FROM `lezione` WHERE `corso_id` = %s AND `docente_id` = %s AND `data` = %s AND `statoLezione` = %s")
-                cursor.execute(query, (corso_id, docente_id, oggi, 'Programmata',))
+                cursor.execute(query, (corso_id, docente_id, oggi, '1',))
 
                 # Ottiene i risultati della query (corsi)
                 lezione_id = cursor.fetchone()['lezione_id']
@@ -333,7 +333,7 @@ def avvia_lezione():
                     flash("Errore durante il salvataggio nel database.", 'error')
 
 
-                query = "UPDATE `lezione` SET `statoLezione`= 'Avviata' WHERE lezione_id = %s"
+                query = "UPDATE `lezione` SET `statoLezione`= '2' WHERE lezione_id = %s"
                 cursor.execute(query, (lezione_id,))
 
                 cursor.close()  # Chiude il cursore
@@ -447,7 +447,7 @@ def programma_lezione():
             data = request.form.get('date')
             descrizione = request.form.get('descrizione')
             query = ("INSERT INTO `lezione`(`corso_id`, `docente_id`, `data`, `descrizione`, `statoLezione`) "
-                     "VALUES (%s, %s, %s, %s, 'Programmata')")
+                     "VALUES (%s, %s, %s, %s, '1')")
             cursor.execute(query, (corso_id, docente_id, data, descrizione,))
 
 
