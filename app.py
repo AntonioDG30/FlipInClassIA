@@ -1,3 +1,5 @@
+import uuid
+
 import openai
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from PIL import Image, ImageDraw, ImageFont
@@ -336,7 +338,7 @@ def avvia_lezione():
                 cursor.close()  # Chiude il cursore
                 conn.close()  # Chiude la connessione al database
 
-                return redirect(url_for('dashboard'))
+                return redirect(url_for('accedi_lezione'))
 
             else:
                 flash("Formato file non valido. Si accettano solo PDF o PPTX", 'error')
@@ -409,46 +411,146 @@ def accedi_lezione():
     if 'user_id' in session:
         lezione_id = request.form['lezione_id']
         corso_id = request.form.get('corso_id')
-        user_id = session['user_id']  # Recupera l'ID utente dalla sessione
-        user_type = session['user_type']  # Recupera il tipo di utente (studente o docente)
-        docente_presidente = ottieniProfessorePresidente(corso_id)  # Ottiene il docente responsabile del corso
-        nome_corso = ottieniNomeCorso(corso_id)  # Ottiene il nome del corso
+        user_id = session['user_id']
+        user_type = session['user_type']
+        docente_presidente = 'Nome del Docente'  # Modifica con la tua funzione `ottieniProfessorePresidente`
+        nome_corso = 'Nome del Corso'  # Modifica con la tua funzione `ottieniNomeCorso`
 
         # Connessione al database
         conn = get_db_connection()
         if conn is None:
-            # In caso di errore nella connessione, restituisce un messaggio di errore come JSON
             return jsonify({"error": "Errore di connessione al database"}), 500
 
         cursor = conn.cursor(dictionary=True)
 
         if user_type == 'studente':
-
-            query = ("SELECT * FROM Presente WHERE studente_id = %s AND lezione_id = %s ")
+            query = "SELECT * FROM Presente WHERE studente_id = %s AND lezione_id = %s"
             cursor.execute(query, (user_id, lezione_id,))
             result = cursor.fetchone()
 
             if result is None:
-                query = ("INSERT INTO Presente (studente_id, lezione_id) VALUES (%s,%s) ")
+                query = "INSERT INTO Presente (studente_id, lezione_id) VALUES (%s, %s)"
                 cursor.execute(query, (user_id, lezione_id,))
+                conn.commit()
 
-
-            cursor.close()  # Chiude il cursore
-            conn.close()  # Chiude la connessione al database
+            cursor.close()
+            conn.close()
 
             return render_template('lezioneStudente.html', user_id=user_id, user_type=user_type,
                                    corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso)
         else:
 
-            cursor.close()  # Chiude il cursore
-            conn.close()  # Chiude la connessione al database
+            # 1. Ottenere l'elenco degli studenti presenti alla lezione
+            query_studenti = """
+                                        SELECT s.nome, s.cognome 
+                                        FROM Studente s 
+                                        JOIN Presente p ON s.studente_id = p.studente_id 
+                                        WHERE p.lezione_id = %s
+                                    """
+            cursor.execute(query_studenti, (lezione_id,))
+            studenti_presenti = cursor.fetchall()
+
+            # 2. Ottenere le domande e le opzioni della lezione
+            query_domande = """
+                                        SELECT d.domanda_id, d.testo_domanda
+                                        FROM Domanda d
+                                        JOIN Questionario q ON d.questionario_id = q.questionario_id
+                                        WHERE q.lezione_id = %s
+                                    """
+            cursor.execute(query_domande, (lezione_id,))
+            domande = cursor.fetchall()
+
+            # 3. Aggiungere le opzioni per ogni domanda
+            for domanda in domande:
+                query_opzioni = """
+                                            SELECT o.testo_opzione, o.opzione_id
+                                            FROM Opzione o
+                                            WHERE o.domanda_id = %s
+                                        """
+                cursor.execute(query_opzioni, (domanda['domanda_id'],))
+                domanda['opzioni'] = cursor.fetchall()
+
+            # 4. Ottenere gli argomenti della lezione
+            query_argomenti = """
+                                        SELECT la.nome_argomento, la.descrizione_argomento
+                                        FROM Lezione_Argomento la
+                                        WHERE la.lezione_id = %s
+                                    """
+            cursor.execute(query_argomenti, (lezione_id,))
+            argomenti = cursor.fetchall()
+
+            cursor.close()
+            conn.close()
+
+            print(f"Lezione ID: {lezione_id}")
+
             return render_template('lezioneDocente.html', user_id=user_id, user_type=user_type,
-                                   corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso)
+                       corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso,
+                       studenti_presenti=studenti_presenti, domande=domande, argomenti=argomenti,
+                       lezione_id=lezione_id)
 
     else:
-        # Se l'utente non è loggato, mostra un messaggio di errore e reindirizza alla pagina di login
-        flash('Devi essere loggato per accedere alla lezione.')
         return redirect(url_for('login'))
+
+
+@app.route('/aggiorna_dati', methods=['POST'])
+def aggiorna_dati():
+    lezione_id = request.json.get('lezione_id')
+
+    # Connessione al database
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Errore di connessione al database"}), 500
+
+    cursor = conn.cursor(dictionary=True)
+
+    # 1. Ottenere l'elenco degli studenti presenti alla lezione
+    query_studenti = """
+        SELECT s.nome, s.cognome 
+        FROM Studente s 
+        JOIN Presente p ON s.studente_id = p.studente_id 
+        WHERE p.lezione_id = %s
+    """
+    cursor.execute(query_studenti, (lezione_id,))
+    studenti_presenti = cursor.fetchall()
+
+    # 2. Ottenere le domande e le opzioni della lezione
+    query_domande = """
+        SELECT d.domanda_id, d.testo_domanda
+        FROM Domanda d
+        JOIN Questionario q ON d.questionario_id = q.questionario_id
+        WHERE q.lezione_id = %s
+    """
+    cursor.execute(query_domande, (lezione_id,))
+    domande = cursor.fetchall()
+
+    # Aggiungere le opzioni per ogni domanda
+    for domanda in domande:
+        query_opzioni = """
+            SELECT o.testo_opzione, o.opzione_id
+            FROM Opzione o
+            WHERE o.domanda_id = %s
+        """
+        cursor.execute(query_opzioni, (domanda['domanda_id'],))
+        domanda['opzioni'] = cursor.fetchall()
+
+    # 3. Ottenere gli argomenti della lezione
+    query_argomenti = """
+        SELECT la.nome_argomento, la.descrizione_argomento
+        FROM Lezione_Argomento la
+        WHERE la.lezione_id = %s
+    """
+    cursor.execute(query_argomenti, (lezione_id,))
+    argomenti = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        'studenti_presenti': studenti_presenti,
+        'domande': domande,
+        'argomenti': argomenti
+    })
 
 
 # Rotta per avviare una Lezione Programmata o Immediata
@@ -1074,6 +1176,116 @@ def profilo():
         # Se l'utente non è loggato, mostra un messaggio e reindirizza al login
         flash('Devi essere loggato per accedere alla dashboard.')
         return redirect(url_for('login'))
+
+
+def generate_user_image(name, cognome, user_id):
+    # Crea un'immagine con uno sfondo colorato casuale
+    img = Image.new('RGB', (200, 200), color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
+
+    # Usa le iniziali del nome e cognome
+    initials = (name[0] + cognome[0]).upper()
+
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("arial.ttf", 100)
+    except IOError:
+        font = ImageFont.load_default()
+
+    # Calcola la posizione per centrare il testo
+    bbox = draw.textbbox((0, 0), initials, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    position = ((img.width - text_width) // 2, (img.height - text_height) // 2)
+
+    # Disegna le iniziali sull'immagine
+    draw.text(position, initials, fill=(255, 255, 255), font=font)
+
+    # Salva l'immagine con il user_id come nome file
+    image_filename = f"{user_id}.png"
+    image_path = os.path.join(USER_IMAGES_PATH, image_filename)
+    img.save(image_path)
+
+    return image_filename  # Restituisci il nome del file per il database
+
+# Rotta per la gestione del form di registrazione
+@app.route('/registratiForm', methods=['GET', 'POST'])
+def registratiForm():
+    if request.method == 'POST':
+        name = request.form['name']
+        cognome = request.form['cognome']
+        email = request.form['email']
+        password = request.form['password']
+        user_type = 'docente' if 'userType' in request.form else 'studente'
+
+        # Connessione al database
+        conn = get_db_connection()
+
+        cursor = conn.cursor(dictionary=True)
+
+        try:
+            # Verifica se l'email esiste già per un docente
+            query = "SELECT * FROM Docente WHERE email = %s"
+            cursor.execute(query, (email,))
+            existing_user = cursor.fetchone()  # Leggi un singolo risultato
+            cursor.fetchall()  # This ensures that all results are fetched
+
+            # Se non esiste tra i docenti, verifica se esiste tra gli studenti
+            if not existing_user:
+                query = "SELECT * FROM Studente WHERE email = %s"
+                cursor.execute(query, (email,))
+                existing_user = cursor.fetchone()  # Leggi un singolo risultato
+                cursor.fetchall()  # Fetch remaining results
+
+            # Se l'email esiste già, mostra un messaggio di errore
+            if existing_user:
+                flash('L\'email esiste già. Riprova!')
+                return redirect(url_for('registrati'))
+            # Genera un ID univoco per l'utente
+            user_id = str(uuid.uuid4())
+            # Cifra la password
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+            # Controlla se un file immagine è stato caricato
+            image = request.files.get('profilePicture')
+            if image and image.filename != '':
+                # Se è stata caricata un'immagine, salvala
+                ext = os.path.splitext(image.filename)[1]  # Estrai l'estensione del file
+                image_filename = f"{user_id}{ext}"
+                image_path = os.path.join(USER_IMAGES_PATH, image_filename)
+                image.save(image_path)  # Salva l'immagine nel percorso specificato
+            else:
+                # Se non è stata caricata un'immagine, genera una immagine predefinita
+                image_filename = generate_user_image(name, cognome, user_id)
+
+            # Inserisci i dati nella tabella appropriata
+            if user_type == 'docente':
+                query = "INSERT INTO Docente (docente_id, nome, cognome, email, password, image_path) VALUES (%s, %s, %s, %s, %s, %s)"
+                cursor.execute(query, (user_id, name, cognome, email, hashed_password.decode('utf-8'), image_filename))
+            else:
+                query = "INSERT INTO Studente (studente_id, nome, cognome, email, password, image_path) VALUES (%s, %s, %s, %s, %s, %s)"
+                cursor.execute(query, (user_id, name, cognome, email, hashed_password.decode('utf-8'), image_filename))
+
+            conn.commit()
+
+        except mysql.connector.Error as err:
+            flash(f'Errore durante la registrazione: {err}')
+            return redirect(url_for('registrati'))
+
+        finally:
+            # Chiudi il cursore e la connessione
+            cursor.close()
+            conn.close()
+
+        # Imposta i dettagli dell'utente nella sessione
+        session['user_id'] = user_id
+        session['user_type'] = user_type
+        session['user_name'] = name + " " + cognome
+        session['image'] = image_filename
+
+        flash('Registrazione avvenuta con successo!')
+        return redirect(url_for('dashboard'))
+
+    return redirect(url_for('registrati'))
 
 
 # Rotta per la modifica del profilo utente
