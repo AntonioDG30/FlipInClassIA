@@ -301,8 +301,6 @@ def avvia_lezione():
             elif 'type_start' in request.form and request.form['type_start'] == "Programmata":
                 lezione_id = request.form.get('lezione_id')
 
-
-
             # Verifica la presenza del file nel form
             if 'file' not in request.files or request.files['file'].filename == '':
                 flash("Nessun file selezionato", 'error')
@@ -332,7 +330,6 @@ def avvia_lezione():
                 else:
                     flash("Errore durante il salvataggio nel database.", 'error')
 
-
                 query = "UPDATE `lezione` SET `statoLezione`= '2' WHERE lezione_id = %s"
                 cursor.execute(query, (lezione_id,))
 
@@ -351,6 +348,7 @@ def avvia_lezione():
         print(f"Errore durante l'avvio della lezione: {e}")
         return "Internal Server Error", 500
 
+
 def lezioni():
     # Controlla se l'utente è loggato
     if 'user_id' in session:
@@ -359,7 +357,6 @@ def lezioni():
 
         # Recupera il corso_id passato come parametro dalla query string
         corso_id = request.args.get('corso_id')
-        print(corso_id)
 
         # Connessione al database
         conn = get_db_connection()
@@ -411,21 +408,48 @@ def lezioni():
 def accedi_lezione():
     if 'user_id' in session:
         lezione_id = request.form['lezione_id']
-        print(lezione_id)
-        # Recupera il corso_id passato come parametro dalla query string
         corso_id = request.form.get('corso_id')
-        print(corso_id)
         user_id = session['user_id']  # Recupera l'ID utente dalla sessione
         user_type = session['user_type']  # Recupera il tipo di utente (studente o docente)
         docente_presidente = ottieniProfessorePresidente(corso_id)  # Ottiene il docente responsabile del corso
         nome_corso = ottieniNomeCorso(corso_id)  # Ottiene il nome del corso
 
-        return render_template('lezioneStudente.html', user_id=user_id, user_type=user_type,
+        # Connessione al database
+        conn = get_db_connection()
+        if conn is None:
+            # In caso di errore nella connessione, restituisce un messaggio di errore come JSON
+            return jsonify({"error": "Errore di connessione al database"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+
+        if user_type == 'studente':
+
+            query = ("SELECT * FROM Presente WHERE studente_id = %s AND lezione_id = %s ")
+            cursor.execute(query, (user_id, lezione_id,))
+            result = cursor.fetchone()
+
+            if result is None:
+                query = ("INSERT INTO Presente (studente_id, lezione_id) VALUES (%s,%s) ")
+                cursor.execute(query, (user_id, lezione_id,))
+
+
+            cursor.close()  # Chiude il cursore
+            conn.close()  # Chiude la connessione al database
+
+            return render_template('lezioneStudente.html', user_id=user_id, user_type=user_type,
                                    corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso)
+        else:
+
+            cursor.close()  # Chiude il cursore
+            conn.close()  # Chiude la connessione al database
+            return render_template('lezioneDocente.html', user_id=user_id, user_type=user_type,
+                                   corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso)
+
     else:
         # Se l'utente non è loggato, mostra un messaggio di errore e reindirizza alla pagina di login
         flash('Devi essere loggato per accedere alla lezione.')
         return redirect(url_for('login'))
+
 
 # Rotta per avviare una Lezione Programmata o Immediata
 @app.route('/programma_lezione', methods=['POST'])
@@ -449,7 +473,6 @@ def programma_lezione():
             query = ("INSERT INTO `lezione`(`corso_id`, `docente_id`, `data`, `descrizione`, `statoLezione`) "
                      "VALUES (%s, %s, %s, %s, '1')")
             cursor.execute(query, (corso_id, docente_id, data, descrizione,))
-
 
             cursor.close()  # Chiude il cursore
             conn.close()  # Chiude la connessione al database
@@ -847,7 +870,6 @@ def lezioni():
 
         # Recupera il corso_id passato come parametro dalla query string
         corso_id = request.args.get('corso_id')
-        print(corso_id)
 
         # Connessione al database
         conn = get_db_connection()

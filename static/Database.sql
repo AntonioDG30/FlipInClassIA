@@ -81,6 +81,15 @@ CREATE TABLE Lezione
     FOREIGN KEY (statoLezione) REFERENCES AttivitàLezione (attività_lezione_id)
 );
 
+-- Creazione della tabella Presente
+CREATE TABLE Presente
+(
+    studente_id VARCHAR(100) NOT NULL,
+    lezione_id    INT NOT NULL,
+    FOREIGN KEY (studente_id) REFERENCES Studente (studente_id),
+    FOREIGN KEY (lezione_id) REFERENCES Lezione (lezione_id)
+);
+
 -- Creazione della tabella Lezione_Argomenti
 CREATE TABLE Lezione_Argomento
 (
