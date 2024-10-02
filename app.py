@@ -385,53 +385,9 @@ def accedi_lezione():
                                    corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso)
         else:
 
-            # 1. Ottenere l'elenco degli studenti presenti alla lezione
-            query_studenti = """
-                                        SELECT s.nome, s.cognome 
-                                        FROM Studente s 
-                                        JOIN Presente p ON s.studente_id = p.studente_id 
-                                        WHERE p.lezione_id = %s
-                                    """
-            cursor.execute(query_studenti, (lezione_id,))
-            studenti_presenti = cursor.fetchall()
-
-            # 2. Ottenere le domande e le opzioni della lezione
-            query_domande = """
-                                        SELECT d.domanda_id, d.testo_domanda, d.corretta_opzione_id
-                                        FROM Domanda d
-                                        JOIN Questionario q ON d.questionario_id = q.questionario_id
-                                        WHERE q.lezione_id = %s
-                                    """
-            cursor.execute(query_domande, (lezione_id,))
-            domande = cursor.fetchall()
-
-            # 3. Aggiungere le opzioni per ogni domanda
-            for domanda in domande:
-                query_opzioni = """
-                                            SELECT o.testo_opzione, o.opzione_id
-                                            FROM Opzione o
-                                            WHERE o.domanda_id = %s
-                                        """
-                cursor.execute(query_opzioni, (domanda['domanda_id'],))
-                domanda['opzioni'] = cursor.fetchall()
-
-            # 4. Ottenere gli argomenti della lezione
-            query_argomenti = """
-                                        SELECT la.nome_argomento, la.descrizione_argomento
-                                        FROM Lezione_Argomento la
-                                        WHERE la.lezione_id = %s
-                                    """
-            cursor.execute(query_argomenti, (lezione_id,))
-            argomenti = cursor.fetchall()
-
-            cursor.close()
-            conn.close()
-
-            print(f"Lezione ID: {lezione_id}")
 
             return render_template('lezioneDocente.html', user_id=user_id, user_type=user_type,
                        corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso,
-                       studenti_presenti=studenti_presenti, domande=domande, argomenti=argomenti,
                        lezione_id=lezione_id)
 
     else:
@@ -488,14 +444,110 @@ def aggiorna_dati():
     cursor.execute(query_argomenti, (lezione_id,))
     argomenti = cursor.fetchall()
 
+    # 4. Ottenere lo stato della lezione dalla tabella AttivitàLezione
+    query_stato_lezione = """
+        SELECT al.stato_lezione, al.modalità_lezione, al.fase_lezione, al.descrizione
+        FROM AttivitàLezione al
+        JOIN Lezione l ON al.attività_lezione_id = l.statoLezione
+        WHERE l.lezione_id = %s
+    """
+    cursor.execute(query_stato_lezione, (lezione_id,))
+    stato_lezione_info = cursor.fetchone()
+
     cursor.close()
     conn.close()
 
     return jsonify({
         'studenti_presenti': studenti_presenti,
         'domande': domande,
-        'argomenti': argomenti
+        'argomenti': argomenti,
+        'stato_lezione': stato_lezione_info['stato_lezione'],
+        'modalità_lezione': stato_lezione_info['modalità_lezione'],
+        'fase_lezione': stato_lezione_info['fase_lezione'],
+        'descrizione': stato_lezione_info['descrizione']
     })
+
+
+@app.route('/modifica_fase_lezione', methods=['POST'])
+def modifica_fase_lezione():
+    data = request.get_json()
+    lezione_id = data.get('lezione_id')
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 1. Recupera l'attuale attività_lezione_id della lezione
+        query_attivita_corrente = """
+            SELECT al.modalità_lezione, al.fase_lezione, al.attività_lezione_id
+            FROM AttivitàLezione al
+            JOIN Lezione l ON al.attività_lezione_id = l.statoLezione
+            WHERE l.lezione_id = %s
+        """
+        cursor.execute(query_attivita_corrente, (lezione_id,))
+        risultato_corrente = cursor.fetchone()
+
+        if risultato_corrente is None:
+            return jsonify({'success': False, 'error': 'Lezione non trovata.'}), 404
+
+        modalità_corrente = risultato_corrente[0]
+        fase_corrente = risultato_corrente[1]
+        attività_lezione_id_corrente = risultato_corrente[2]
+
+        # 2. Trova la prossima attività_lezione_id in base alla modalità e alla fase corrente
+        query_prossima_fase = """
+            SELECT attività_lezione_id
+            FROM AttivitàLezione
+            WHERE modalità_lezione = %s AND attività_lezione_id = %s + 1
+            ORDER BY fase_lezione ASC
+            LIMIT 1
+        """
+        cursor.execute(query_prossima_fase, (modalità_corrente, attività_lezione_id_corrente))
+        nuova_fase_id = cursor.fetchone()
+
+        if nuova_fase_id is None:
+            return jsonify({'success': False, 'error': 'Non ci sono altre fasi disponibili per questa modalità.'}), 400
+
+        nuova_fase_id = nuova_fase_id[0]
+
+        # 3. Aggiorna lo stato della lezione nella tabella Lezione
+        query_update_fase = """
+            UPDATE Lezione
+            SET statoLezione = %s
+            WHERE lezione_id = %s
+        """
+        cursor.execute(query_update_fase, (nuova_fase_id, lezione_id))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Errore: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+
+@app.route('/termina_lezione', methods=['POST'])
+def termina_lezione():
+    data = request.get_json()
+    lezione_id = data.get('lezione_id')
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        # Imposta lo stato della lezione come "terminata"
+        query = "UPDATE Lezione SET statoLezione = (SELECT attività_lezione_id FROM AttivitàLezione WHERE stato_lezione = 'terminata') WHERE lezione_id = %s"
+        cursor.execute(query, (lezione_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Errore: {e}")
+        return jsonify({'success': False})
+
+
 
 
 # Rotta per avviare una Lezione Programmata o Immediata

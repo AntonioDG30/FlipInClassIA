@@ -4527,6 +4527,20 @@ input:checked + .slider:before {
 }
 
 /* Stile per l'estetica della pagina lezioneDocenti */
+.lezione-docente-buttons-container {
+    position: absolute; /* Posiziona in modo assoluto all'interno della sezione */
+    bottom: 20px; /* Spazio dalla parte inferiore della sezione */
+    right: 20px; /* Spazio dal lato destro della sezione */
+    display: flex;
+    flex-direction: column; /* Disposizione verticale */
+    align-items: flex-end; /* Allinea i bottoni a destra */
+}
+
+.lezione-docente-section {
+    position: relative; /* Necessario per ancorare il contenitore pulsanti assoluto */
+    padding-bottom: 80px; /* Spazio sufficiente per i pulsanti */
+}
+
 .lezione-docente-container {
     padding: 40px 80px;
 }
@@ -4554,7 +4568,7 @@ input:checked + .slider:before {
 
 .lezione-docente-flex-container .lezione-docente-section {
     flex: 1;
-    background-color: #fff;
+    background-color: #f9f9f9;
     border-radius: 8px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     padding: 20px;
@@ -4613,8 +4627,8 @@ input:checked + .slider:before {
 .lezione-docente-check-icon {
     color: #28a745;
     margin-right: 5px;
+    margin-bottom: 5px;
     position: absolute;
-    left: -25px;
     top: 50%;
     transform: translateY(-50%);
 }
@@ -4629,7 +4643,6 @@ input:checked + .slider:before {
 .darkmode .lezione-docente-check-icon {
     color: #5cb85c;
 }
-
 
 /* Stile per i pulsanti di controllo */
 .lezione-docente-control-buttons {
@@ -4671,6 +4684,10 @@ input:checked + .slider:before {
 }
 
 /* Modalità scura */
+.darkmode .lezione-docente-flex-container .lezione-docente-section {
+    background-color: #222235;
+}
+
 .darkmode .lezione-docente-white-block {
     background-color: var(--dark-bg-color, #222235);
     color: var(--dark-text-color, #e0e0e0);
@@ -4692,7 +4709,7 @@ input:checked + .slider:before {
 }
 
 .darkmode .lezione-docente-question-block ul li {
-    background-color: #333;
+    background-color: #4b4a5e;
     color: #e0e0e0;
 }
 
@@ -4702,7 +4719,7 @@ input:checked + .slider:before {
 }
 
 .darkmode .lezione-docente-correct-answer {
-    background-color: #355a3a;
+    background-color: #808fb4;
     color: #b2fab4;
     border-left: 5px solid #5cb85c;
 }
@@ -4711,23 +4728,115 @@ input:checked + .slider:before {
     color: #5cb85c;
 }
 
-.darkmode .lezione-docente-control-buttons button {
-    background-color: var(--dark-button-bg-color, #222235);
-    color: var(--dark-text-color, #ffffff);
-}
-
-.darkmode .lezione-docente-control-buttons button:hover {
-    background-color: var(--dark-button-hover-bg-color, #777);
-}
-
 .darkmode .lezione-docente-users-table th {
-    background-color: var(--dark-table-header-bg-color, #444);
+    background-color: var(--dark-table-header-bg-color, #2c2c42);
 }
 
 .darkmode .lezione-docente-users-table td {
-    background-color: var(--dark-table-cell-bg-color, #2c2c42);
+    background-color: var(--dark-table-cell-bg-color, #4b4a5e);
     color: var(--dark-text-color, #ffffff);
 }
+
+/* Stile per il bottone di modifica della fase */
+.lezione-docente-button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.lezione-docente-button:hover {
+    background-color: #0056b3;
+}
+
+/* Modalità scura */
+.darkmode .lezione-docente-button {
+    background-color: #555;
+    color: #e0e0e0;
+}
+
+.darkmode .lezione-docente-button:hover {
+    background-color: #333;
+}
+
+/* Enhanced Section Styles */
+.enhanced-section {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced Button Styles */
+.enhanced-button {
+    background-color: #2f49d1;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 65px;
+}
+
+.enhanced-button:hover {
+    background-color: #4661f0;
+    transform: scale(1.05);
+}
+
+.enhanced-button:active {
+    background-color: #1d3a8c;
+    transform: scale(0.98);
+}
+
+/* Enhanced End Lesson Button */
+.enhanced-end-button {
+    background-color: #e74c3c;
+    position: absolute;
+    bottom: 20px;
+    right: 0px;
+    max-height: 40px;
+    min-width: 200px;
+}
+
+.enhanced-end-button:hover {
+    background-color: #c0392b;
+}
+
+/* Dark Mode Compatibility */
+.darkmode .enhanced-section {
+    background-color: #2c2c42;
+    color: #eff0f6;
+    box-shadow: none;
+}
+
+.darkmode .enhanced-button {
+    background-color: #4661f0;
+    color: #eff0f6;
+}
+
+.darkmode .enhanced-button:hover {
+    background-color: #5a72f5;
+}
+
+.darkmode .enhanced-end-button {
+    background-color: #e74c3c;
+}
+
+.darkmode .enhanced-end-button:hover {
+    background-color: #c0392b;
+}
+
+
+
+
 
 
 
