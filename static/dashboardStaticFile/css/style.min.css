@@ -3554,7 +3554,6 @@ input:checked + .slider:before {
     }
 
 
-
     .sort-bar {
         padding: 20px
     }
@@ -4348,7 +4347,6 @@ input:checked + .slider:before {
 }
 
 
-
 .dark-mode .quiz-container-unique, .dark-mode .review-container-unique {
     background-color: #222235;
     color: #eff0f6;
@@ -4835,9 +4833,49 @@ input:checked + .slider:before {
 }
 
 
-
-
-
-
-
 /*# sourceMappingURL=style.min.css.map */
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .lezione-docente-flex-container {
+        flex-direction: column;
+    }
+
+    .lezione-docente-section {
+        width: 100%;
+        margin-bottom: 20px;
+        flex-direction: column;
+        min-height: 400px;
+    }
+
+
+    .lezione-docente-users-table {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .lezione-docente-container {
+        width: 100%;
+        padding: 10px 20px;
+        margin: 0;
+    }
+
+    .lezione-docente-white-block {
+        width: 100%;
+        padding: 10px 20px; /* Add some padding for content */
+        box-sizing: border-box;
+        margin-bottom: 20px;
+    }
+
+    .lezione-docente-flex-container {
+        width: 100%;
+    }
+
+    .lezione-docente-users-table {
+        width: 100%;
+    }
+}
+
+
+/* Make sections take the full width of the screen */
+

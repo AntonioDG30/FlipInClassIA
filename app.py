@@ -542,7 +542,7 @@ def termina_lezione():
         conn.commit()
         cursor.close()
         conn.close()
-        return jsonify({'success': True})
+        return redirect(url_for('lezioni'))
     except Exception as e:
         print(f"Errore: {e}")
         return jsonify({'success': False})

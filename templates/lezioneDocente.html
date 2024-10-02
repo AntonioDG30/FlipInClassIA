@@ -160,8 +160,8 @@
                     domanda.opzioni.forEach(opzione => {
                         const isCorrect = opzione.opzione_id === domanda.corretta_opzione_id;
                         questionBlock += `<li class="${isCorrect ? 'lezione-docente-correct-answer' : ''}">
-                                        ${isCorrect ? '<span class="lezione-docente-check-icon">✔️</span>' : ''}
                                         ${opzione.testo_opzione}
+                                        ${isCorrect ? '<span class="lezione-docente-check-icon">✔️</span>' : ''}
                                       </li>`;
                     });
                     questionBlock += '</ul></div>';
@@ -189,7 +189,6 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('Fase della lezione aggiornata con successo!');
                     aggiornaDati(); // Aggiorna i dati della pagina
                 } else {
                     alert('Errore nell\'aggiornamento della fase della lezione.');
@@ -207,10 +206,7 @@
         })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    alert('Lezione terminata con successo!');
-                    aggiornaDati(); // Aggiorna i dati della pagina
-                } else {
+                if (!data.success) {
                     alert('Errore nella terminazione della lezione.');
                 }
             });
