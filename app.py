@@ -35,6 +35,7 @@ os.makedirs(USER_IMAGES_PATH, exist_ok=True)
 # Configura la chiave API di OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
+
 # Endpoint API per ottenere lo stato della lezione
 @app.route('/aggiorna_dati_studenti', methods=['POST'])
 def aggiorna_dati_studenti():
@@ -57,6 +58,53 @@ def aggiorna_dati_studenti():
 
     return jsonify({
         'statolezione': statolezione['statolezione']
+    })
+
+@app.route('/ottieni_questionario', methods=['POST'])
+def ottieni_questionario():
+    lezione_id = request.json.get('lezione_id')
+
+    print(lezione_id)
+
+    if lezione_id is None:
+        return jsonify({"error": "ID lezione non fornito"}), 400
+
+    # Connessione al database
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Errore di connessione al database"}), 500
+
+    cursor = conn.cursor(dictionary=True)
+
+    # 2. Ottenere le domande e le opzioni della lezione
+    query_domande = """
+            SELECT d.domanda_id, d.testo_domanda, d.corretta_opzione_id
+            FROM Domanda d
+            JOIN Questionario q ON d.questionario_id = q.questionario_id
+            WHERE q.lezione_id = %s
+        """
+    cursor.execute(query_domande, (lezione_id,))
+    domande = cursor.fetchall()
+
+    # Aggiungere le opzioni per ogni domanda
+    for domanda in domande:
+        query_opzioni = """
+                SELECT o.testo_opzione, o.opzione_id
+                FROM Opzione o
+                WHERE o.domanda_id = %s
+            """
+        cursor.execute(query_opzioni, (domanda['domanda_id'],))
+        domanda['opzioni'] = cursor.fetchall()
+
+
+    print(domande)
+
+    # Chiude il cursore e la connessione
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        'domande': domande
     })
 
 
