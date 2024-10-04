@@ -35,6 +35,30 @@ os.makedirs(USER_IMAGES_PATH, exist_ok=True)
 # Configura la chiave API di OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
+# Endpoint API per ottenere lo stato della lezione
+@app.route('/aggiorna_dati_studenti', methods=['POST'])
+def aggiorna_dati_studenti():
+    lezione_id = request.json.get('lezione_id')
+
+    # Connessione al database
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Errore di connessione al database"}), 500
+
+    cursor = conn.cursor(dictionary=True)
+
+    # 1. Ottenere l'elenco degli studenti presenti alla lezione
+    query = "SELECT statolezione FROM lezione WHERE lezione_id = %s"
+    cursor.execute(query, (lezione_id,))
+    statolezione = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        'statolezione': statolezione['statolezione']
+    })
+
 
 # Funzione per estrarre testo da PDF
 def estrai_testo_da_pdf(filepath):
@@ -382,13 +406,13 @@ def accedi_lezione():
             conn.close()
 
             return render_template('lezioneStudente.html', user_id=user_id, user_type=user_type,
-                                   corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso)
+                                   corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso,
+                                   lezione_id=lezione_id)
         else:
 
-
             return render_template('lezioneDocente.html', user_id=user_id, user_type=user_type,
-                       corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso,
-                       lezione_id=lezione_id)
+                                   corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso,
+                                   lezione_id=lezione_id)
 
     else:
         return redirect(url_for('login'))
@@ -527,7 +551,6 @@ def modifica_fase_lezione():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-
 @app.route('/termina_lezione', methods=['POST'])
 def termina_lezione():
     data = request.get_json()
@@ -546,8 +569,6 @@ def termina_lezione():
     except Exception as e:
         print(f"Errore: {e}")
         return jsonify({'success': False})
-
-
 
 
 # Rotta per avviare una Lezione Programmata o Immediata
@@ -1203,6 +1224,7 @@ def generate_user_image(name, cognome, user_id):
     img.save(image_path)
 
     return image_filename  # Restituisci il nome del file per il database
+
 
 # Rotta per la gestione del form di registrazione
 @app.route('/registratiForm', methods=['GET', 'POST'])
