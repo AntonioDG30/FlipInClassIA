@@ -36,6 +36,114 @@ os.makedirs(USER_IMAGES_PATH, exist_ok=True)
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 
+import numpy as np
+
+@app.route('/invia_questionario', methods=['POST'])
+def invia_questionario():
+    data = request.json
+    lezione_id = data.get('lezione_id')
+    studente_id = data.get('studente_id')
+    questionario_id = data.get('questionario_id')
+    risposte = data.get('risposte', [])
+
+    try:
+        # Connessione al database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Aggiorna la tabella "Risposta_Studente"
+        for risposta in risposte:
+            domanda_id = risposta['domanda_id']
+            opzione_scelta_id = risposta['opzione_scelta_id']
+
+            # Inserisci nella tabella "Risposta_Studente"
+            cursor.execute('''
+                INSERT INTO risposta_studente (studente_id, domanda_id, opzione_scelta_id)
+                VALUES (%s, %s, %s)
+            ''', (studente_id, int(domanda_id), int(opzione_scelta_id)))
+
+        # Calcola le statistiche dello studente
+        num_risposte_corrette = sum(1 for r in risposte if r['risposta'] == r['corretta'])
+        num_risposte_errate = len(risposte) - num_risposte_corrette
+        punteggio = (num_risposte_corrette / len(risposte)) * 100
+
+        # Aggiorna "Statistiche_Studente"
+        cursor.execute('''
+            INSERT INTO statistiche_studente (studente_id, questionario_id, risposte_corrette, risposte_errate, punteggio)
+            VALUES (%s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+            risposte_corrette = VALUES(risposte_corrette), 
+            risposte_errate = VALUES(risposte_errate), 
+            punteggio = VALUES(punteggio)
+        ''', (studente_id, int(questionario_id), num_risposte_corrette, num_risposte_errate, punteggio))
+
+        # Ottieni tutte le statistiche degli studenti per calcolare i valori aggregati
+        cursor.execute('''
+            SELECT punteggio
+            FROM statistiche_studente
+            WHERE questionario_id = %s
+        ''', (int(questionario_id),))
+        punteggi_studenti = cursor.fetchall()
+        punteggi_studenti = [p[0] for p in punteggi_studenti]  # Convertiamo i punteggi in una lista di float
+
+        # Calcola `percentuale_successo`
+        num_studenti_successo = sum(1 for p in punteggi_studenti if p >= 50)
+        percentuale_successo = (num_studenti_successo / len(punteggi_studenti)) * 100 if punteggi_studenti else 0
+
+
+        # Calcola `varianza_punteggio`
+        varianza_punteggio = np.var(punteggi_studenti) if punteggi_studenti else 0
+
+        # Ottieni le statistiche attuali per aggiornare "Statistiche_Questionario"
+        cursor.execute('''
+            SELECT numero_domande, risposte_corrette, risposte_errate, punteggio_medio
+            FROM statistiche_questionario
+            WHERE questionario_id = %s
+        ''', (int(questionario_id),))
+        result = cursor.fetchone()
+
+        if result:
+            numero_domande, risposte_corrette, risposte_errate, punteggio_medio = result
+
+            # Calcola i nuovi valori
+            nuovo_numero_domande = numero_domande + len(risposte)
+            nuovo_risposte_corrette = risposte_corrette + num_risposte_corrette
+            nuovo_risposte_errate = risposte_errate + num_risposte_errate
+            nuovo_punteggio_medio = (nuovo_risposte_corrette * 100) / nuovo_numero_domande
+
+            # Aggiorna "Statistiche_Questionario"
+            cursor.execute('''
+                UPDATE statistiche_questionario 
+                SET numero_domande = %s, 
+                    risposte_corrette = %s, 
+                    risposte_errate = %s,
+                    punteggio_medio = %s,
+                    percentuale_successo = %s,
+                    varianza_punteggio = %s
+                WHERE questionario_id = %s
+            ''', (nuovo_numero_domande, nuovo_risposte_corrette, nuovo_risposte_errate, nuovo_punteggio_medio,
+                  percentuale_successo, varianza_punteggio, int(questionario_id)))
+        else:
+            # Inserisci un nuovo record se non esiste ancora
+            cursor.execute('''
+                INSERT INTO statistiche_questionario (questionario_id, numero_domande, risposte_corrette, risposte_errate, punteggio_medio, percentuale_successo, varianza_punteggio)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ''', (int(questionario_id), len(risposte), num_risposte_corrette, num_risposte_errate, punteggio,
+                  percentuale_successo, varianza_punteggio))
+
+        # Commit delle modifiche
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        print(f'Errore durante l\'aggiornamento del database: {e}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+
 # Endpoint API per ottenere lo stato della lezione
 @app.route('/aggiorna_dati_studenti', methods=['POST'])
 def aggiorna_dati_studenti():
@@ -440,6 +548,12 @@ def accedi_lezione():
 
         cursor = conn.cursor(dictionary=True)
 
+        query = "SELECT questionario_id FROM questionario WHERE lezione_id = %s"
+        cursor.execute(query, (lezione_id,))
+        questionario_id = cursor.fetchone()['questionario_id']
+
+
+
         if user_type == 'studente':
             query = "SELECT * FROM Presente WHERE studente_id = %s AND lezione_id = %s"
             cursor.execute(query, (user_id, lezione_id,))
@@ -455,12 +569,12 @@ def accedi_lezione():
 
             return render_template('lezioneStudente.html', user_id=user_id, user_type=user_type,
                                    corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso,
-                                   lezione_id=lezione_id)
+                                   lezione_id=lezione_id, questionario_id=questionario_id)
         else:
 
             return render_template('lezioneDocente.html', user_id=user_id, user_type=user_type,
                                    corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso,
-                                   lezione_id=lezione_id)
+                                   lezione_id=lezione_id, questionario_id=questionario_id)
 
     else:
         return redirect(url_for('login'))
