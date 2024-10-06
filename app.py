@@ -36,8 +36,8 @@ os.makedirs(USER_IMAGES_PATH, exist_ok=True)
 # Configura la chiave API di OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-
 import numpy as np
+
 
 @app.route('/invia_questionario', methods=['POST'])
 def invia_questionario():
@@ -91,7 +91,6 @@ def invia_questionario():
         num_studenti_successo = sum(1 for p in punteggi_studenti if p >= 50)
         percentuale_successo = (num_studenti_successo / len(punteggi_studenti)) * 100 if punteggi_studenti else 0
 
-
         # Calcola `varianza_punteggio`
         varianza_punteggio = np.var(punteggi_studenti) if punteggi_studenti else 0
 
@@ -144,7 +143,6 @@ def invia_questionario():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-
 # Endpoint API per ottenere lo stato della lezione
 @app.route('/aggiorna_dati_studenti', methods=['POST'])
 def aggiorna_dati_studenti():
@@ -174,8 +172,9 @@ def aggiorna_dati_studenti():
     return jsonify({
         'statolezione': statolezione['statolezione'],
         'avvio_primaFase': int(avvioquestionario['avvio_primaFase'].timestamp()),
-        'avvio_secondaFase':  int(avvioquestionario['avvio_secondaFase'].timestamp())
+        'avvio_secondaFase': int(avvioquestionario['avvio_secondaFase'].timestamp())
     })
+
 
 @app.route('/ottieni_questionario', methods=['POST'])
 def ottieni_questionario():
@@ -458,6 +457,7 @@ def salva_macro_aree_e_questionario(lezione_id, macro_aree, questionario):
 def avvia_lezione():
     try:
         if 'user_id' in session and session['user_type'] == 'docente':
+            corso_id = request.form.get('corso_id')
 
             conn = get_db_connection()
             if conn is None:
@@ -471,7 +471,6 @@ def avvia_lezione():
             docente_id = session['user_id']
 
             if 'type_start' in request.form and request.form['type_start'] == "Immediata":
-                corso_id = request.form.get('corso_id')
                 oggi = datetime.now().date()  # Ottiene la data odierna
                 descrizione = request.form.get('descrizione')
                 query = ("INSERT INTO lezione(corso_id, docente_id, data, descrizione, statoLezione) "
@@ -507,6 +506,10 @@ def avvia_lezione():
                 elif file.filename.endswith('.pptx'):
                     testo = estrai_testo_da_pptx(filepath)
 
+                print(testo)
+
+                '''
+
                 # Generazione delle macro-aree e del questionario in un unico blocco
                 macro_aree, questionario = genera_macro_aree_e_questionario(testo)
 
@@ -515,6 +518,8 @@ def avvia_lezione():
                     flash("Lezione avviata con successo e questionario generato.", 'success')
                 else:
                     flash("Errore durante il salvataggio nel database.", 'error')
+                    
+                '''
 
                 query = "UPDATE lezione SET statoLezione= '2' WHERE lezione_id = %s"
                 cursor.execute(query, (lezione_id,))
@@ -522,7 +527,8 @@ def avvia_lezione():
                 cursor.close()  # Chiude il cursore
                 conn.close()  # Chiude la connessione al database
 
-                return redirect(url_for('accedi_lezione'))
+                return redirect(url_for('accedi_lezione', lezione_id=lezione_id, corso_id=corso_id))
+
 
             else:
                 flash("Formato file non valido. Si accettano solo PDF o PPTX", 'error')
@@ -535,15 +541,20 @@ def avvia_lezione():
         return "Internal Server Error", 500
 
 
-@app.route('/accedi_lezione', methods=['POST'])
+@app.route('/accedi_lezione', methods=['GET', 'POST'])
 def accedi_lezione():
-    if 'user_id' in session:
-        lezione_id = request.form['lezione_id']
+    # Verifica se si tratta di una richiesta GET
+    if request.method == 'GET':
+        lezione_id = request.args.get('lezione_id')
+        corso_id = request.args.get('corso_id')
+    elif request.method == 'POST':
+        # Recupera i dati dalla richiesta POST
+        lezione_id = request.form.get('lezione_id')
         corso_id = request.form.get('corso_id')
+
+    if 'user_id' in session:
         user_id = session['user_id']
         user_type = session['user_type']
-        docente_presidente = 'Nome del Docente'  # Modifica con la tua funzione `ottieniProfessorePresidente`
-        nome_corso = 'Nome del Corso'  # Modifica con la tua funzione `ottieniNomeCorso`
 
         # Connessione al database
         conn = get_db_connection()
@@ -555,8 +566,6 @@ def accedi_lezione():
         query = "SELECT questionario_id FROM questionario WHERE lezione_id = %s"
         cursor.execute(query, (lezione_id,))
         questionario_id = cursor.fetchone()['questionario_id']
-
-
 
         if user_type == 'studente':
             query = "SELECT * FROM Presente WHERE studente_id = %s AND lezione_id = %s"
@@ -572,13 +581,11 @@ def accedi_lezione():
             conn.close()
 
             return render_template('lezioneStudente.html', user_id=user_id, user_type=user_type,
-                                   corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso,
-                                   lezione_id=lezione_id, questionario_id=questionario_id)
+                                   corso_id=corso_id, lezione_id=lezione_id, questionario_id=questionario_id)
         else:
 
             return render_template('lezioneDocente.html', user_id=user_id, user_type=user_type,
-                                   corso_id=corso_id, docente_presidente=docente_presidente, nome_corso=nome_corso,
-                                   lezione_id=lezione_id, questionario_id=questionario_id)
+                                   corso_id=corso_id, lezione_id=lezione_id, questionario_id=questionario_id)
 
     else:
         return redirect(url_for('login'))
