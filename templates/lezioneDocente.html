@@ -199,7 +199,10 @@
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({'lezione_id': {{ lezione_id | tojson | default('null') }}})
+            body: JSON.stringify({
+                'lezione_id': {{ lezione_id | tojson | default('null') }},
+                'questionario_id': {{ questionario_id | tojson | default('null') }},
+            })
         })
             .then(response => response.json())
             .then(data => {
@@ -218,21 +221,23 @@
                 'Content-Type': 'application/json'
             },
             body:JSON.stringify({
-                    'lezione_id': {{ lezione_id | tojson | default('null') }},
-                    'corso_id': {{ corso_id | tojson | default('null') }},
-                })
+                    'lezione_id': {{ lezione_id | tojson | default('null') }}
+            })
         })
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {
                     alert('Errore nella terminazione della lezione.');
+                } else {
+                    const corso_id = {{ corso_id | tojson | default('null') }};
+                    window.location.href = `/lezioni?corso_id=${corso_id}`;
                 }
             });
     }
 
     function disabilitaPulsantiPerQuestionario() {
         // Calcola il tempo di disabilitazione in base al numero di domande (in millisecondi)
-        const tempoDisabilitazione = domande * 45 * 1000;
+        const tempoDisabilitazione = domande * 3 * 1000;
 
 
         // Disabilita i pulsanti

@@ -13,6 +13,7 @@ import secrets
 import random
 import re
 import nltk
+from tensorflow import timestamp
 
 nltk.download('punkt')  # Scarica solo il pacchetto necessario
 
@@ -148,6 +149,7 @@ def invia_questionario():
 @app.route('/aggiorna_dati_studenti', methods=['POST'])
 def aggiorna_dati_studenti():
     lezione_id = request.json.get('lezione_id')
+    questionario_id = request.json.get('questionario_id')
 
     # Connessione al database
     conn = get_db_connection()
@@ -161,11 +163,18 @@ def aggiorna_dati_studenti():
     cursor.execute(query, (lezione_id,))
     statolezione = cursor.fetchone()
 
+    # 2. Ottenere ora inizio questionario
+    query = "SELECT avvio_primaFase, avvio_secondaFase FROM questionario WHERE lezione_id = %s AND questionario_id = %s"
+    cursor.execute(query, (lezione_id, questionario_id))
+    avvioquestionario = cursor.fetchone()
+
     cursor.close()
     conn.close()
 
     return jsonify({
-        'statolezione': statolezione['statolezione']
+        'statolezione': statolezione['statolezione'],
+        'avvio_primaFase': int(avvioquestionario['avvio_primaFase'].timestamp()),
+        'avvio_secondaFase':  int(avvioquestionario['avvio_secondaFase'].timestamp())
     })
 
 @app.route('/ottieni_questionario', methods=['POST'])
@@ -653,6 +662,7 @@ def aggiorna_dati():
 def modifica_fase_lezione():
     data = request.get_json()
     lezione_id = data.get('lezione_id')
+    questionario_id = data.get('questionario_id')
 
     try:
         conn = get_db_connection()
@@ -698,8 +708,27 @@ def modifica_fase_lezione():
             WHERE lezione_id = %s
         """
         cursor.execute(query_update_fase, (nuova_fase_id, lezione_id))
-        conn.commit()
 
+        data_ora_avvio = datetime.now()
+        print(f"data: {data_ora_avvio}")
+
+        if nuova_fase_id == 3:
+            query_inizio_questionario = """
+                        UPDATE Questionario
+                        SET avvio_primaFase = %s
+                        WHERE lezione_id = %s AND questionario_id = %s 
+                    """
+            cursor.execute(query_inizio_questionario, (data_ora_avvio, lezione_id, questionario_id))
+
+        if nuova_fase_id == 5:
+            query_inizio_questionario = """
+                        UPDATE Questionario
+                        SET avvio_secondaFase = %s
+                        WHERE lezione_id = %s AND questionario_id = %s 
+                    """
+            cursor.execute(query_inizio_questionario, (data_ora_avvio, lezione_id, questionario_id))
+
+        conn.commit()
         cursor.close()
         conn.close()
         return jsonify({'success': True})
@@ -712,7 +741,6 @@ def modifica_fase_lezione():
 def termina_lezione():
     data = request.get_json()
     lezione_id = data.get('lezione_id')
-    corso_id = data.get('corso_id')
 
     try:
         conn = get_db_connection()
@@ -723,7 +751,7 @@ def termina_lezione():
         conn.commit()
         cursor.close()
         conn.close()
-        return redirect(url_for('lezioni', corso_id=corso_id))
+        return jsonify({'success': True})
     except Exception as e:
         print(f"Errore: {e}")
         return jsonify({'success': False})
@@ -1148,6 +1176,7 @@ def lezioni():
 
         # Recupera il corso_id passato come parametro dalla query string
         corso_id = request.args.get('corso_id')
+        print(corso_id)
 
         # Connessione al database
         conn = get_db_connection()
