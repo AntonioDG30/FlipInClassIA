@@ -7,7 +7,6 @@
     <title>FlipInClassIA - Lezione</title>
     <link rel="shortcut icon" href="../static/dashboardStaticFile/img/svg/Logo.svg" type="image/x-icon">
     <link rel="stylesheet" href="../static/dashboardStaticFile/css/style.min.css">
-
 </head>
 <body>
 
@@ -50,7 +49,6 @@
             </div>
         </section>
 
-
         <!-- Destra: Operazioni del Docente -->
         <section class="lezione-docente-section">
             <h2 class="lezione-docente-section-title">Operazioni del Docente</h2>
@@ -80,8 +78,6 @@
                 </div>
             </div>
         </section>
-
-
     </div>
 
     <!-- 3. Sezione: Tabella degli Studenti Presenti -->
@@ -108,6 +104,11 @@
 
 <!-- Script per l'aggiornamento dei dati -->
 <script>
+
+    let domande = 0;
+    let esecuzionePrimoQuestionario = 0;
+    let esecuzioneSecondoQuestionario = 0;
+
     function aggiornaDati() {
         const lezioneId = {{ lezione_id | tojson | default('null') }};
         fetch('/aggiorna_dati', {
@@ -119,11 +120,14 @@
         })
             .then(response => response.json())
             .then(data => {
+                domande = data.domande.length;
+
                 // Aggiorna lo stato della lezione
                 document.getElementById('stato-lezione').textContent = data.stato_lezione;
                 document.getElementById('modalita-lezione').textContent = data.modalità_lezione;
                 document.getElementById('fase-lezione').textContent = data.fase_lezione;
                 document.getElementById('descrizione-lezione').textContent = data.descrizione;
+
 
                 // Aggiorna il testo del pulsante in base allo stato della lezione
                 const faseLezioneBtnText = document.getElementById('fase-lezione-btn-text');
@@ -131,17 +135,27 @@
 
                 // Mostra o nasconde il pulsante in base alla fase attuale
                 if (data.modalità_lezione === 'Questionari' &&
-                    (data.fase_lezione === 'Attesa' || data.fase_lezione === 'Primo_questionario' || data.fase_lezione === 'Libera')) {
+                    (data.fase_lezione === 'Attesa' || data.fase_lezione === 'Primo_questionario'
+                        || data.fase_lezione === 'Libera')) {
                     faseLezioneContainer.style.display = 'block'; // Mostra il pulsante
                     if (data.fase_lezione === 'Attesa') {
                         faseLezioneBtnText.textContent = 'Somministra primo questionario';
                     } else if (data.fase_lezione === 'Primo_questionario') {
+                        if (esecuzionePrimoQuestionario <= '0') {
+                            disabilitaPulsantiPerQuestionario();
+                            esecuzionePrimoQuestionario++;
+                        }
                         faseLezioneBtnText.textContent = 'Passa alla fase libera';
                     } else if (data.fase_lezione === 'Libera') {
                         faseLezioneBtnText.textContent = 'Somministra ultimo questionario';
                     }
                 } else {
                     faseLezioneContainer.style.display = 'none'; // Nasconde il pulsante
+                    if (data.modalità_lezione === 'Questionari' && data.fase_lezione === 'Ultimo_questionario'
+                        && esecuzioneSecondoQuestionario <= '0') {
+                        disabilitaPulsantiPerQuestionario();
+                        esecuzioneSecondoQuestionario++;
+                    }
                 }
 
                 // Aggiorna la tabella degli studenti presenti
@@ -152,6 +166,7 @@
                     studentiPresentiTable.innerHTML += row;
                 });
 
+
                 // Aggiorna le domande e le opzioni
                 const domandeContent = document.getElementById('domande-content');
                 domandeContent.innerHTML = '';  // Svuota il contenuto precedente
@@ -160,9 +175,9 @@
                     domanda.opzioni.forEach(opzione => {
                         const isCorrect = opzione.opzione_id === domanda.corretta_opzione_id;
                         questionBlock += `<li class="${isCorrect ? 'lezione-docente-correct-answer' : ''}">
-                                        ${opzione.testo_opzione}
-                                        ${isCorrect ? '<span class="lezione-docente-check-icon">✔️</span>' : ''}
-                                      </li>`;
+                                            ${opzione.testo_opzione}
+                                            ${isCorrect ? '<span class="lezione-docente-check-icon">✔️</span>' : ''}
+                                          </li>`;
                     });
                     questionBlock += '</ul></div>';
                     domandeContent.innerHTML += questionBlock;
@@ -202,7 +217,10 @@
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({'lezione_id': {{ lezione_id | tojson | default('null') }}})
+            body:JSON.stringify({
+                    'lezione_id': {{ lezione_id | tojson | default('null') }},
+                    'corso_id': {{ corso_id | tojson | default('null') }},
+                })
         })
             .then(response => response.json())
             .then(data => {
@@ -212,12 +230,30 @@
             });
     }
 
+    function disabilitaPulsantiPerQuestionario() {
+        // Calcola il tempo di disabilitazione in base al numero di domande (in millisecondi)
+        const tempoDisabilitazione = domande * 45 * 1000;
+
+
+        // Disabilita i pulsanti
+        const pulsanti = document.querySelectorAll('.lezione-docente-buttons-container button');
+        pulsanti.forEach(button => {
+            button.disabled = true;
+        });
+
+        // Riabilita i pulsanti dopo il tempo calcolato
+        setTimeout(() => {
+            pulsanti.forEach(button => {
+                button.disabled = false;
+            });
+        }, tempoDisabilitazione);
+    }
+
     aggiornaDati();
 
     // Esegui aggiornamenti periodici
     setInterval(aggiornaDati, 5000);  // Ogni 5 secondi
 </script>
-
 
 <!-- Librerie JS -->
 <script src="../static/dashboardStaticFile/plugins/chart.min.js"></script>

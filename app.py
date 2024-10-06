@@ -60,7 +60,7 @@ def invia_questionario():
             cursor.execute('''
                 INSERT INTO risposta_studente (studente_id, domanda_id, opzione_scelta_id)
                 VALUES (%s, %s, %s)
-            ''', (studente_id, int(domanda_id), int(opzione_scelta_id)))
+            ''', (studente_id, int(domanda_id), int(opzione_scelta_id) if opzione_scelta_id is not None else None))
 
         # Calcola le statistiche dello studente
         num_risposte_corrette = sum(1 for r in risposte if r['risposta'] == r['corretta'])
@@ -172,8 +172,6 @@ def aggiorna_dati_studenti():
 def ottieni_questionario():
     lezione_id = request.json.get('lezione_id')
 
-    print(lezione_id)
-
     if lezione_id is None:
         return jsonify({"error": "ID lezione non fornito"}), 400
 
@@ -203,9 +201,6 @@ def ottieni_questionario():
             """
         cursor.execute(query_opzioni, (domanda['domanda_id'],))
         domanda['opzioni'] = cursor.fetchall()
-
-
-    print(domande)
 
     # Chiude il cursore e la connessione
     cursor.close()
@@ -717,6 +712,7 @@ def modifica_fase_lezione():
 def termina_lezione():
     data = request.get_json()
     lezione_id = data.get('lezione_id')
+    corso_id = data.get('corso_id')
 
     try:
         conn = get_db_connection()
@@ -727,7 +723,7 @@ def termina_lezione():
         conn.commit()
         cursor.close()
         conn.close()
-        return redirect(url_for('lezioni'))
+        return redirect(url_for('lezioni', corso_id=corso_id))
     except Exception as e:
         print(f"Errore: {e}")
         return jsonify({'success': False})

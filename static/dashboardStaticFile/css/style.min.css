@@ -4447,9 +4447,17 @@ input:checked + .slider:before {
     transform: scale(1.05);
 }
 
-.button-unique:disabled {
+.button-unique:disabled,
+.lezione-docente-button:disabled {
     background-color: #ccc;
     cursor: not-allowed;
+}
+
+.lezione-docente-button:disabled {
+    background-color: #ccc; /* Grigio chiaro */
+    color: #666; /* Testo grigio */
+    cursor: not-allowed; /* Cambia il cursore per indicare che non è cliccabile */
+    opacity: 0.6; /* Riduce l'opacità per dare un effetto "spento" */
 }
 
 .review-container-unique {
