@@ -13,8 +13,7 @@ import secrets
 import random
 import re
 import nltk
-from tensorflow import timestamp
-
+import numpy as np
 nltk.download('punkt')  # Scarica solo il pacchetto necessario
 
 # Inizializza l'app Flask
@@ -36,7 +35,71 @@ os.makedirs(USER_IMAGES_PATH, exist_ok=True)
 # Configura la chiave API di OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-import numpy as np
+# Rotta per visualizzare la lista dei professori che partecipano a un corso
+@app.route('/ottieniStatistiche')
+def ottieniStatistiche():
+    # Controlla se l'utente è loggato
+    if 'user_id' in session:
+        user_id = session['user_id']  # Recupera l'ID utente dalla sessione
+        user_type = session['user_type']  # Recupera il tipo di utente (studente o docente)
+
+        # Recupera il corso_id passato come parametro dalla query string
+        corso_id = request.args.get('corso_id')
+
+        # Connessione al database
+        conn = get_db_connection()
+        if conn is None:
+            # In caso di errore nella connessione, restituisce un messaggio di errore come JSON
+            return jsonify({"error": "Errore di connessione al database"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+
+        # Ottieni tutte le statistiche
+        statistiche_questionario = []
+        statistiche_studente = []
+
+        if user_type == 'docente':
+            # Ottieni tutte le statistiche dei questionari per il corso
+            cursor.execute("""
+                   SELECT l.data AS data, sq.punteggio_medio, sq.percentuale_successo
+                   FROM questionario q
+                   JOIN statistiche_questionario sq ON q.questionario_id = sq.questionario_id
+                   JOIN lezione l ON q.lezione_id = l.lezione_id
+                   WHERE l.corso_id = %s
+               """, (corso_id,))
+            statistiche_questionario = cursor.fetchall()
+
+        elif user_type == 'studente':
+            # Ottieni tutte le statistiche per lo studente
+            cursor.execute("""
+                   SELECT l.data AS data, ss.punteggio, ss.risposte_corrette, ss.risposte_errate
+                   FROM questionario q
+                   JOIN statistiche_studente ss ON q.questionario_id = ss.questionario_id
+                   JOIN lezione l ON q.lezione_id = l.lezione_id
+                   WHERE ss.studente_id = %s AND l.corso_id = %s
+               """, (user_id, corso_id))
+            statistiche_studente = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        docente_presidente = ottieniProfessorePresidente(corso_id)  # Ottiene il docente responsabile del corso
+        nome_corso = ottieniNomeCorso(corso_id)  # Ottiene il nome del corso
+
+        # Chiude il cursore e la connessione
+        cursor.close()
+        conn.close()
+
+        # Restituisce la pagina con l'elenco dei professori partecipanti ('professori_partecipanti.html')
+        return render_template('statistiche.html', user_id=user_id, user_type=user_type,
+                               corso_id=corso_id, statistiche_questionario=statistiche_questionario,
+                               statistiche_studente=statistiche_studente,
+                               docente_presidente=docente_presidente, nome_corso=nome_corso)
+
+    else:
+        # Se l'utente non è loggato, mostra un messaggio di errore e reindirizza alla pagina di login
+        flash('Devi essere loggato per accedere alla dashboard.')
+    return redirect(url_for('login'))
 
 
 @app.route('/invia_questionario', methods=['POST'])
