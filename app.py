@@ -61,24 +61,27 @@ def ottieniStatistiche():
         if user_type == 'docente':
             # Ottieni tutte le statistiche dei questionari per il corso
             cursor.execute("""
-                   SELECT l.data AS data, sq.punteggio_medio, sq.percentuale_successo
-                   FROM questionario q
-                   JOIN statistiche_questionario sq ON q.questionario_id = sq.questionario_id
-                   JOIN lezione l ON q.lezione_id = l.lezione_id
-                   WHERE l.corso_id = %s
-               """, (corso_id,))
+                    SELECT l.data AS data, sq.punteggio_medio, sq.percentuale_successo, 
+                           sq.numero_domande, sq.risposte_corrette, sq.risposte_errate, sq.varianza_punteggio
+                    FROM questionario q
+                    JOIN statistiche_questionario sq ON q.questionario_id = sq.questionario_id
+                    JOIN lezione l ON q.lezione_id = l.lezione_id
+                    WHERE l.corso_id = %s
+                """, (corso_id,))
             statistiche_questionario = cursor.fetchall()
 
         elif user_type == 'studente':
             # Ottieni tutte le statistiche per lo studente
             cursor.execute("""
-                   SELECT l.data AS data, ss.punteggio, ss.risposte_corrette, ss.risposte_errate
-                   FROM questionario q
-                   JOIN statistiche_studente ss ON q.questionario_id = ss.questionario_id
-                   JOIN lezione l ON q.lezione_id = l.lezione_id
-                   WHERE ss.studente_id = %s AND l.corso_id = %s
-               """, (user_id, corso_id))
+                    SELECT l.data AS data, ss.punteggio, ss.risposte_corrette, ss.risposte_errate, ss.feedback_suggerito
+                    FROM questionario q
+                    JOIN statistiche_studente ss ON q.questionario_id = ss.questionario_id
+                    JOIN lezione l ON q.lezione_id = l.lezione_id
+                    WHERE ss.studente_id = %s AND l.corso_id = %s
+                """, (user_id, corso_id))
             statistiche_studente = cursor.fetchall()
+
+            print(statistiche_studente)
 
         cursor.close()
         conn.close()
