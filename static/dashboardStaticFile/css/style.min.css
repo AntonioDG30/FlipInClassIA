@@ -3678,6 +3678,14 @@ input:checked + .slider:before {
     overflow: hidden;
 }
 
+/* Media query per schermi piccoli (come smartphone) */
+@media (max-width: 480px) {
+    #calendar {
+        width: 100%; /* Imposta la larghezza al 100% del container */
+        height: auto; /* Permette all'altezza di adattarsi al contenuto */
+    }
+}
+
 .header {
     height: 50px;
     width: 420px;
