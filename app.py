@@ -67,6 +67,7 @@ def ottieniStatistiche():
                     JOIN statistiche_questionario sq ON q.questionario_id = sq.questionario_id
                     JOIN lezione l ON q.lezione_id = l.lezione_id
                     WHERE l.corso_id = %s
+                    ORDER BY l.data
                 """, (corso_id,))
             statistiche_questionario = cursor.fetchall()
 
@@ -78,6 +79,7 @@ def ottieniStatistiche():
                     JOIN statistiche_studente ss ON q.questionario_id = ss.questionario_id
                     JOIN lezione l ON q.lezione_id = l.lezione_id
                     WHERE ss.studente_id = %s AND l.corso_id = %s
+                    ORDER BY l.data
                 """, (user_id, corso_id))
             statistiche_studente = cursor.fetchall()
 
