@@ -2791,7 +2791,8 @@ input:checked + .slider:before {
     color: #d6d7e3
 }
 
-.darkmode .main-title {
+.darkmode .main-title,
+.darkmode .title-section{
     color: #eff0f6
 }
 
@@ -4949,6 +4950,99 @@ input:checked + .slider:before {
         transform: rotate(360deg);
     }
 }
+
+/* CSS personalizzato per il layout */
+.charts-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+}
+
+.chart-item {
+    flex: 1 1 30%;
+    min-width: 300px;
+}
+
+
+/* Stile per i filtri e il pulsante di esportazione */
+.bottom-right {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    position: relative;
+    margin-top: 20px;
+    align-self: flex-end;
+    width: fit-content;
+}
+
+.filter-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.filter-container label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.bottom-right select,
+.bottom-right button,
+.bottom-right input {
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    width: 100%;
+}
+
+.bottom-right button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    transition: background-color 0.3s;
+}
+
+.bottom-right button:hover {
+    background-color: #0056b3;
+}
+
+/* Modalità Scura per il contenitore dei bottoni */
+.darkmode .bottom-right {
+    background: #222235; /* Sfondo scuro */
+    color: #eff0f6; /* Testo chiaro */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); /* Ombra più scura */
+}
+
+/* Modalità Scura per la parte dei filtri */
+.darkmode .bottom-right .filter-container label {
+    color: #eff0f6; /* Testo chiaro */
+}
+
+.darkmode .bottom-right input[type="date"] {
+    background-color: #2c2c42; /* Sfondo degli input */
+    color: #eff0f6; /* Testo chiaro */
+    border: 1px solid #555; /* Bordo più scuro */
+}
+
+.darkmode .bottom-right button {
+    background-color: #4661f0; /* Sfondo del pulsante */
+    color: #eff0f6; /* Testo chiaro */
+    border: 1px solid #555; /* Bordo più scuro */
+}
+
+/* Hover per i bottoni in modalità scura */
+.darkmode .bottom-right button:hover {
+    background-color: #364fc7; /* Colore del pulsante durante hover */
+    color: #fff; /* Testo chiaro */
+}
+
 
 
 /* Make sections take the full width of the screen */
