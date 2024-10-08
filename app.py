@@ -14,6 +14,7 @@ import random
 import re
 import nltk
 import numpy as np
+
 nltk.download('punkt')  # Scarica solo il pacchetto necessario
 
 # Inizializza l'app Flask
@@ -34,6 +35,119 @@ os.makedirs(USER_IMAGES_PATH, exist_ok=True)
 
 # Configura la chiave API di OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
+
+
+# Funzione migliorata per generare il feedback personalizzato per lo studente
+def genera_feedback(domande, risposte):
+    try:
+        # Richiesta per generare le 5 macro-aree più importanti
+        prompt_macro = (
+            f"Per favore, agisci come se fossi un professore universitario e restituisci un feedback in italiano agli studenti "
+            f"per aiutarli a comprendere cosa devono migliorare e come farlo. Il feedback deve essere una frase da massimo 2/3 righe. "
+            f"Rispondimi restituendomi solo il feedback. Il feedback deve essere mirato a far capire cosa lo studente non ha saputo "
+            f"rispondere, analizzando magari l'argomento errato ecc. Considera ha svolto il questionario due volte, una ad inizio lezione ed una alla fine. "
+            f"Realizza il feedback basandoti sulle seguenti domande: {domande} al cui lo studente ha dato le seguenti risposte: {risposte}")
+
+        response_macro = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system",
+                 "content": "Sei un professore universitario che genera feedback personalizzati ai propri studenti dalle risposte"
+                            " di un questionario."},
+                {"role": "user", "content": prompt_macro}
+            ],
+            max_tokens=300,  # Limita i token di output
+            temperature=0.5,
+        )
+
+        # Estrai il contenuto del feedback dalla risposta dell'API
+        feedback = response_macro.choices[0].message['content']
+
+    except Exception as e:
+        print(f"Errore durante la generazione: {e}")
+        return ""
+
+    return feedback  # Ritorna il feedback estratto
+
+
+@app.route('/ottieniFeedback')
+def ottieniFeedback():
+    # Controlla se l'utente è loggato
+    if 'user_id' in session:
+        user_id = session['user_id']  # Recupera l'ID utente dalla sessione
+        user_type = session['user_type']  # Recupera il tipo di utente (studente o docente)
+
+        # Recupera il corso_id e questionario_id passati come parametri dalla query string
+        questionario_id = request.args.get('questionario_id')
+        corso_id = request.args.get('corso_id')
+
+        # Connessione al database
+        conn = get_db_connection()
+        if conn is None:
+            # In caso di errore nella connessione, restituisce un messaggio di errore come JSON
+            return jsonify({"error": "Errore di connessione al database"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+
+        # Ottenere le domande e le opzioni della lezione
+        query_domande = """
+                    SELECT d.domanda_id, d.testo_domanda, d.corretta_opzione_id
+                    FROM Domanda d
+                    WHERE d.questionario_id = %s
+                """
+        cursor.execute(query_domande, (questionario_id,))
+        domande = cursor.fetchall()
+
+        # Aggiungere le opzioni per ogni domanda
+        for domanda in domande:
+            query_opzioni = """
+                        SELECT o.testo_opzione, o.opzione_id
+                        FROM Opzione o
+                        WHERE o.domanda_id = %s
+                    """
+            cursor.execute(query_opzioni, (domanda['domanda_id'],))
+            domanda['opzioni'] = cursor.fetchall()
+
+        query_risposte = """
+                            SELECT r.domanda_id, r.opzione_scelta_id
+                            FROM risposta_studente r
+                            JOIN domanda d ON d.domanda_id = r.domanda_id
+                            WHERE r.studente_id = %s and d.questionario_id = %s
+                        """
+        cursor.execute(query_risposte, (user_id, questionario_id,))
+        risposte = cursor.fetchall()
+
+        feedback = genera_feedback(domande, risposte)
+
+        query_statistiche_id = """
+                                    SELECT s.statistiche_studente_id
+                                    FROM statistiche_studente s
+                                    WHERE s.studente_id = %s and s.questionario_id = %s
+                                    ORDER BY s.statistiche_studente_id DESC LIMIT 1
+                                """
+        cursor.execute(query_statistiche_id, (user_id, questionario_id,))
+        statistiche_studente_id = cursor.fetchone()['statistiche_studente_id']
+
+        salva_feedback = """
+                              UPDATE statistiche_studente s
+                              SET s.feedback_suggerito = %s
+                              WHERE s.statistiche_studente_id = %s                                
+                         """
+        cursor.execute(salva_feedback, (feedback, statistiche_studente_id,))
+
+        # Chiude il cursore e la connessione
+        cursor.close()
+        conn.commit()
+        conn.close()
+
+        # Restituisce la pagina delle statistiche ('ottieniStatistiche.html')
+        return redirect(url_for('ottieniStatistiche', corso_id=corso_id))
+
+    else:
+        # Se l'utente non è loggato, mostra un messaggio di errore e reindirizza alla pagina di login
+        flash('Devi essere loggato per accedere alla dashboard.')
+    return redirect(url_for('login'))
+
 
 # Rotta per visualizzare la lista dei professori che partecipano a un corso
 @app.route('/ottieniStatistiche')
@@ -82,8 +196,6 @@ def ottieniStatistiche():
                     ORDER BY l.data
                 """, (user_id, corso_id))
             statistiche_studente = cursor.fetchall()
-
-            print(statistiche_studente)
 
         cursor.close()
         conn.close()
@@ -239,8 +351,10 @@ def aggiorna_dati_studenti():
 
     return jsonify({
         'statolezione': statolezione['statolezione'],
-        'avvio_primaFase': int(avvioquestionario['avvio_primaFase'].timestamp()),
-        'avvio_secondaFase': int(avvioquestionario['avvio_secondaFase'].timestamp())
+        'avvio_primaFase': int(avvioquestionario['avvio_primaFase'].timestamp()) if avvioquestionario[
+            'avvio_primaFase'] else None,
+        'avvio_secondaFase': int(avvioquestionario['avvio_secondaFase'].timestamp()) if avvioquestionario[
+            'avvio_secondaFase'] else None
     })
 
 
@@ -258,7 +372,7 @@ def ottieni_questionario():
 
     cursor = conn.cursor(dictionary=True)
 
-    # 2. Ottenere le domande e le opzioni della lezione
+    # Ottenere le domande e le opzioni della lezione
     query_domande = """
             SELECT d.domanda_id, d.testo_domanda, d.corretta_opzione_id
             FROM Domanda d
@@ -338,17 +452,17 @@ def pulisci_e_segmenta_testo(testo):
     return segmenti
 
 
-# Funzione migliorata per generare macro-aree e questionario con gestione della troncatura
 def genera_macro_aree_e_questionario(testo):
     # Segmenta il testo in parti più piccole
     segmenti = pulisci_e_segmenta_testo(testo)
 
     macro_aree = []
     questionario = []
+    domande_generate = 0
+    domande_gia_generate = []  # Registro delle domande già generate
 
     # Unisci solo i primi 2 segmenti e riduci il testo totale per evitare di superare il limite di token
-    testo_unificato = " ".join(segmenti[:2])[
-                      :2000]  # Riduci ulteriormente il testo totale a un massimo di 2000 caratteri
+    testo_unificato = " ".join(segmenti[:2])[:2000]
 
     try:
         # Richiesta per generare le 5 macro-aree più importanti
@@ -364,7 +478,7 @@ def genera_macro_aree_e_questionario(testo):
                  "content": "Sei un professore universitario che genera macro-aree da un testo di lezione."},
                 {"role": "user", "content": prompt_macro}
             ],
-            max_tokens=300,  # Limita i token di output
+            max_tokens=300,
             temperature=0.5,
         )
 
@@ -372,7 +486,7 @@ def genera_macro_aree_e_questionario(testo):
         macro_lines = response_macro['choices'][0]['message']['content'].strip().split('\n')
         for line in macro_lines:
             if ':' in line:
-                nome_argomento, descrizione_argomento = line.split(':', 1)  # Dividi in nome e descrizione
+                nome_argomento, descrizione_argomento = line.split(':', 1)
                 nome_argomento = nome_argomento.strip()
                 descrizione_argomento = descrizione_argomento.strip()
                 if nome_argomento and descrizione_argomento:
@@ -380,25 +494,28 @@ def genera_macro_aree_e_questionario(testo):
 
         # Limita il numero di domande da generare tra 10 e 15
         num_domande = random.randint(10, 15)
-        domande_generate = 0
 
         # Suddividi ulteriormente il testo in segmenti più piccoli per la generazione del questionario
         for segmento in segmenti:
             if domande_generate >= num_domande:
-                break  # Ferma se abbiamo raggiunto il numero di domande richiesto
+                break
 
-            # Limita il segmento a un massimo di 1000 caratteri
             segmento_limitato = segmento[:1000]
 
-            # Gestisci la generazione iterativa delle domande
             while domande_generate < num_domande:
-                num_domande_richieste = min(5, num_domande - domande_generate)  # Richiedi tra 3 e 5 domande
+                num_domande_richieste = min(5, num_domande - domande_generate)
 
-                # Richiesta per generare un blocco di domande per il segmento attuale
+                # Crea una lista di domande già generate per informare l'AI di evitare ripetizioni
+                domande_testo = "\n".join([domanda['testo_domanda'] for domanda in domande_gia_generate])
+
+                # Richiesta per generare un blocco di domande
                 prompt_questionario = (
                     f"Basandoti sul testo seguente, crea un questionario a risposta multipla con 4 opzioni di cui una sola è corretta. "
                     f"Crea {num_domande_richieste} domande che variano su tutti gli argomenti del testo. Non numerare le domande. "
-                    f"Indica esplicitamente quale opzione è corretta alla fine di ogni domanda, nel formato 'Risposta corretta: X)': {segmento_limitato}")
+                    f"Evita di ripetere i seguenti argomenti: {domande_testo}. "
+                    f"Assicurati che ogni domanda abbia esattamente 4 opzioni e una risposta corretta indicata chiaramente nel formato 'Risposta corretta: X)'. "
+                    f"Formato delle domande: [Domanda], A) [Opzione 1], B) [Opzione 2], C) [Opzione 3], D) [Opzione 4], Risposta corretta: X). "
+                    f"Ecco il testo: {segmento_limitato}")
 
                 response_questionario = openai.ChatCompletion.create(
                     model="gpt-4",
@@ -407,7 +524,7 @@ def genera_macro_aree_e_questionario(testo):
                          "content": "Sei un professore universitario che crea questionari a risposta multipla basati su un testo."},
                         {"role": "user", "content": prompt_questionario}
                     ],
-                    max_tokens=500,  # Limita i token di output
+                    max_tokens=500,
                     temperature=0.5,
                 )
 
@@ -418,36 +535,42 @@ def genera_macro_aree_e_questionario(testo):
 
                 for line in question_lines:
                     line = line.strip()
-                    if line.startswith(('1.', '2.', '3.', '4.', '5.')) or line.startswith(
-                            tuple(str(i) + '.' for i in range(1, 16))):  # Riconosce l'inizio di una nuova domanda
+
+                    # Identifica una nuova domanda se la linea non inizia con un'opzione o con 'Risposta corretta:'
+                    if not line.startswith(('A)', 'B)', 'C)', 'D)', 'Risposta corretta:')):
                         if current_question:
-                            if corretta_opzione:
-                                # Trova e contrassegna l'opzione corretta in base all'indicazione dell'IA
+                            # Verifica che la domanda abbia esattamente 4 opzioni e una risposta corretta
+                            if len(current_question['opzioni']) == 4 and corretta_opzione:
                                 for opzione in current_question['opzioni']:
                                     if opzione['testo_opzione'].startswith(corretta_opzione):
                                         opzione['corretta'] = True
-                            questionario.append(current_question)
-                            domande_generate += 1
+                                questionario.append(current_question)
+                                domande_gia_generate.append(current_question)  # Aggiungi al registro delle domande
+                                domande_generate += 1
+                            else:
+                                print(f"Domanda incompleta o senza risposta corretta: {current_question['testo_domanda']}")
                             if domande_generate >= num_domande:
-                                break  # Ferma se abbiamo raggiunto il numero di domande richiesto
-                        current_question = {"testo_domanda": line, "opzioni": []}
-                        corretta_opzione = None  # Reset per la nuova domanda
-                    elif line.startswith(('A)', 'B)', 'C)', 'D)')) and current_question:  # Riconosce una nuova opzione
-                        current_question['opzioni'].append({"testo_opzione": line, "corretta": False})
-                    elif line.startswith(
-                            'Risposta corretta:') and current_question:  # Riconosce l'indicazione della risposta corretta
-                        corretta_opzione = line.split(':')[
-                            1].strip()  # Estrae la risposta corretta (es. 'A)', 'B)', ecc.)
+                                break
 
+                        # Inizia una nuova domanda
+                        current_question = {"testo_domanda": line, "opzioni": []}
+                        corretta_opzione = None
+
+                    elif line.startswith(('A)', 'B)', 'C)', 'D)')) and current_question:
+                        current_question['opzioni'].append({"testo_opzione": line, "corretta": False})
+                    elif line.startswith('Risposta corretta:') and current_question:
+                        corretta_opzione = line.split(':')[1].strip()
+
+                # Verifica che la domanda corrente sia completa
                 if current_question and domande_generate < num_domande:
-                    if corretta_opzione:
+                    if len(current_question['opzioni']) == 4 and corretta_opzione:
                         for opzione in current_question['opzioni']:
                             if opzione['testo_opzione'].startswith(corretta_opzione):
                                 opzione['corretta'] = True
-                    questionario.append(current_question)
-                    domande_generate += 1
+                        questionario.append(current_question)
+                        domande_gia_generate.append(current_question)  # Aggiungi al registro delle domande
+                        domande_generate += 1
 
-            # Ferma se abbiamo raggiunto il numero di domande richiesto
             if domande_generate >= num_domande:
                 break
 
@@ -455,7 +578,8 @@ def genera_macro_aree_e_questionario(testo):
         print(f"Errore durante la generazione: {e}")
         return [], []
 
-    return macro_aree[:5], questionario  # Ritorna solo i primi 5 macro-argomenti e il questionario
+    return macro_aree[:5], questionario
+
 
 
 def salva_macro_aree_e_questionario(lezione_id, macro_aree, questionario):
@@ -574,10 +698,6 @@ def avvia_lezione():
                 elif file.filename.endswith('.pptx'):
                     testo = estrai_testo_da_pptx(filepath)
 
-                print(testo)
-
-                '''
-
                 # Generazione delle macro-aree e del questionario in un unico blocco
                 macro_aree, questionario = genera_macro_aree_e_questionario(testo)
 
@@ -586,8 +706,6 @@ def avvia_lezione():
                     flash("Lezione avviata con successo e questionario generato.", 'success')
                 else:
                     flash("Errore durante il salvataggio nel database.", 'error')
-                    
-                '''
 
                 query = "UPDATE lezione SET statoLezione= '2' WHERE lezione_id = %s"
                 cursor.execute(query, (lezione_id,))
@@ -631,14 +749,17 @@ def accedi_lezione():
 
         cursor = conn.cursor(dictionary=True)
 
+        # Assicurati di leggere il risultato della query
         query = "SELECT questionario_id FROM questionario WHERE lezione_id = %s"
         cursor.execute(query, (lezione_id,))
-        questionario_id = cursor.fetchone()['questionario_id']
+        questionario_result = cursor.fetchone()  # Modificato per assicurarsi che i risultati siano letti
+        questionario_id = questionario_result['questionario_id'] if questionario_result else None
+        cursor.fetchall()
 
         if user_type == 'studente':
             query = "SELECT * FROM Presente WHERE studente_id = %s AND lezione_id = %s"
             cursor.execute(query, (user_id, lezione_id,))
-            result = cursor.fetchone()
+            result = cursor.fetchone()  # Modificato per assicurarsi che i risultati siano letti
 
             if result is None:
                 query = "INSERT INTO Presente (studente_id, lezione_id) VALUES (%s, %s)"
@@ -651,6 +772,8 @@ def accedi_lezione():
             return render_template('lezioneStudente.html', user_id=user_id, user_type=user_type,
                                    corso_id=corso_id, lezione_id=lezione_id, questionario_id=questionario_id)
         else:
+            cursor.close()
+            conn.close()
 
             return render_template('lezioneDocente.html', user_id=user_id, user_type=user_type,
                                    corso_id=corso_id, lezione_id=lezione_id, questionario_id=questionario_id)
@@ -785,7 +908,6 @@ def modifica_fase_lezione():
         cursor.execute(query_update_fase, (nuova_fase_id, lezione_id))
 
         data_ora_avvio = datetime.now()
-        print(f"data: {data_ora_avvio}")
 
         if nuova_fase_id == 3:
             query_inizio_questionario = """
@@ -1251,7 +1373,6 @@ def lezioni():
 
         # Recupera il corso_id passato come parametro dalla query string
         corso_id = request.args.get('corso_id')
-        print(corso_id)
 
         # Connessione al database
         conn = get_db_connection()
