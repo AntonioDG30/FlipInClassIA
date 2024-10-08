@@ -17,8 +17,6 @@ Il progetto si è sviluppato tenendo in considerazione l'analisi dello stato del
 
 - **Tutela della privacy**: Per garantire la massima riservatezza, il docente può visualizzare esclusivamente l’andamento della classe nel suo complesso, senza accedere ai dati specifici dei singoli studenti.
 
-- **Accessibilità**: Il tool è progettato per essere accessibile a tutti gli studenti, compresi quelli con disabilità, seguendo gli standard di accessibilità (es. WCAG).
-
 ## Indice
 
 - [Introduzione](#introduzione)
